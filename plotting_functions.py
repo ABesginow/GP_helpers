@@ -2,11 +2,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-
 # Usage examples:
-#plot_training_data(train_x, train_y)
-#plot_training_data(train_x, train_y, plot_separately=True, ncols=2, titles="Sensor")
-#plot_training_data(train_x, train_y, colors=['red', 'green', 'blue'], show=True)
+# plot_training_data(train_x, train_y)
+# plot_training_data(train_x, train_y, plot_separately=True, ncols=2, titles="Sensor")
+# plot_training_data(train_x, train_y, colors=['red', 'green', 'blue'], show=True)
 def plot_training_data(
     X_train,
     Y_train,
