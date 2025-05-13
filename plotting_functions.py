@@ -1,13 +1,14 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
+
 def plot_single_input_gp_posterior(
-    X_train, Y_train, 
-    X_test, Y_pred_mean, Y_pred_var, 
+    X_train, Y_train,
+    X_test, Y_pred_mean, Y_pred_var,
     n_std=2,
-    show=True, 
+    show=True,
     return_fig=False,
-    fig=None, 
+    fig=None,
     ax=None,
     colors=None,
     ncols=1,
@@ -60,6 +61,7 @@ def plot_single_input_gp_posterior(
     if colors is None:
         colors = plt.cm.tab10.colors  # default color cycle
     if len(colors) < num_outputs:
+        # a // b  is the same as floor(a / b)
         colors = (colors * ((num_outputs // len(colors)) + 1))[:num_outputs]
 
     # Handle subplot layout
