@@ -1,4 +1,4 @@
-from util_functions import log_normalized_prior, get_full_kernels_in_kernel_expression
+from .util_functions import log_normalized_prior, get_full_kernels_in_kernel_expression
 import gpytorch
 import numpy as np
 from pygranso.pygranso import pygranso
@@ -48,7 +48,7 @@ def fixed_reinit(model, parameters: torch.tensor) -> None:
 
 
 # Define the PyGRANSO training loop
-def granso_optimization(model, likelihood, **kwargs):
+def granso_optimization(model, likelihood, train_x, train_y, **kwargs):
     """
     find optimal hyperparameters either by BO or by starting from random initial values multiple times, using an optimizer every time
     and then returning the best result
@@ -187,8 +187,6 @@ def granso_optimization(model, likelihood, **kwargs):
                                         1, 0, 1, stat_vec, self.stat_val, 0)
     """
 
-    train_x = kwargs.get("X", model.train_inputs)
-    train_y = kwargs.get("Y", model.train_targets)
     MAP = kwargs.get("MAP", True)
     double_precision = kwargs.get("double_precision", False)
     verbose = kwargs.get("verbose", False)
