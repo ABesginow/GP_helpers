@@ -2,6 +2,106 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
+
+# Usage examples:
+#plot_training_data(train_x, train_y)
+#plot_training_data(train_x, train_y, plot_separately=True, ncols=2, titles="Sensor")
+#plot_training_data(train_x, train_y, colors=['red', 'green', 'blue'], show=True)
+def plot_training_data(
+    X_train,
+    Y_train,
+    show=True,
+    return_fig=False,
+    plot_separately=False,
+    fig=None,
+    ax=None,
+    colors=None,
+    ncols=1,
+    figsize=None,
+    titles=None,
+    xlabel="Input",
+    ylabel="Output",
+):
+    """
+    Plot raw training data with optional per-channel subplots or combined plot.
+
+    Parameters:
+    - X_train: (N,) input values
+    - Y_train: (N,) or (N, D) output values
+    - show: whether to call plt.show()
+    - return_fig: whether to return figure
+    - plot_separately: if True, use subplots; otherwise, combine in one plot
+    - fig, ax: optionally provide existing matplotlib Figure and Axes
+    - colors: optional list of colors per output
+    - ncols: number of columns for subplot layout
+    - figsize: figure size tuple
+    - titles: optional list of titles or base title string
+    - xlabel: label for x-axis
+    - ylabel: label for y-axis
+    
+    Returns:
+    - fig (optional): the matplotlib Figure object if return_fig is True
+    """
+
+    X_train = np.asarray(X_train).squeeze()
+    Y_train = np.asarray(Y_train)
+
+    if Y_train.ndim == 1:
+        Y_train = Y_train[:, np.newaxis]
+
+    num_outputs = Y_train.shape[1]
+
+    if colors is None:
+        colors = plt.cm.tab10.colors
+    if len(colors) < num_outputs:
+        colors = (colors * ((num_outputs // len(colors)) + 1))[:num_outputs]
+
+    if plot_separately:
+        nrows = int(np.ceil(num_outputs / ncols))
+        if ax is None or fig is None:
+            fig, ax = plt.subplots(nrows, ncols, figsize=figsize or (5 * ncols, 3 * nrows), squeeze=False)
+        ax = ax.flatten()
+
+        if isinstance(titles, str):
+            titles = [f"{titles} {i}" for i in range(num_outputs)]
+        elif titles is None:
+            titles = [f"Output Dimension {i}" for i in range(num_outputs)]
+
+        for i in range(num_outputs):
+            ax_i = ax[i]
+            ax_i.plot(X_train, Y_train[:, i], '.', color=colors[i], label=f"Channel {i}")
+            ax_i.set_title(titles[i])
+            ax_i.set_xlabel(xlabel)
+            ax_i.set_ylabel(ylabel)
+            ax_i.grid(True)
+
+        for j in range(num_outputs, len(ax)):
+            fig.delaxes(ax[j])
+
+        plt.tight_layout()
+
+    else:
+        if ax is None or fig is None:
+            fig, ax = plt.subplots(figsize=figsize or (8, 6))
+
+        for i in range(num_outputs):
+            ax.plot(X_train, Y_train[:, i], '.', color=colors[i], label=f"Channel {i}")
+        ax.set_title(titles if isinstance(titles, str) else "Training Data")
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        ax.legend()
+        ax.grid(True)
+
+    if show:
+        plt.show()
+
+    if return_fig:
+        return fig
+
+
+# Usage examples:
+# plot_gp_predictions(..., ncols=2, titles=["Pressure", "Temperature"], xlabel="Time")
+# colors = ['red', 'green', 'blue']
 def plot_single_input_gp_posterior(
     X_train, Y_train,
     X_test, Y_pred_mean, Y_pred_var,
