@@ -1,0 +1,172 @@
+import itertools
+import torch
+
+uninformed_prior_dict = {'SE': {'raw_lengthscale' : {"mean": 0. , "std":10.}},
+                  'MAT52': {'raw_lengthscale' :{"mean": 0., "std":10. } },
+                  'MAT32': {'raw_lengthscale' :{"mean": 0., "std":10. } },
+                  'RQ': {'raw_lengthscale' :{"mean": 0., "std":10. },
+                          'raw_alpha' :{"mean": 0., "std":10. } },
+                  'PER':{'raw_lengthscale':{"mean": 0., "std":10. },
+                          'raw_period_length':{"mean": 0., "std":10. } },
+                  'LIN':{'raw_variance' :{"mean": 0., "std":10. } },
+                  'AFF':{'raw_variance' :{"mean": 0., "std":10. } },
+                  'c':{'raw_outputscale':{"mean": 0., "std":10. } },
+                  'noise': {'raw_noise':{"mean": 0., "std":10. }}}
+
+# An empirically derived prior for the parameters of the kernels
+informed_prior_dict = {'SE': {'raw_lengthscale' : {"mean": -0.21221139138922668 , "std":1.8895426067756804}},
+                  'MAT52': {'raw_lengthscale' :{"mean": 0.7993038925994188, "std":2.145122566357853 } },
+                  'MAT32': {'raw_lengthscale' :{"mean": 1.5711054238673443, "std":2.4453761235991216 } },
+                  'RQ': {'raw_lengthscale' :{"mean": -0.049841950913676276, "std":1.9426354614713097 },
+                          'raw_alpha' :{"mean": 1.882148553921053, "std":3.096431944989054 } },
+                  'PER':{'raw_lengthscale':{"mean": 0.7778461197268618, "std":2.288946656544974 },
+                          'raw_period_length':{"mean": 0.6485334993738499, "std":0.9930632050553377 } },
+                  'LIN':{'raw_variance' :{"mean": -0.8017903983055685, "std":0.9966569921354465 } },
+                  'AFF':{'raw_variance' :{"mean": -0.8017903983055685, "std":0.9966569921354465 } },
+                  'c':{'raw_outputscale':{"mean": -1.6253091096349706, "std":2.2570021716661923 } },
+                  'noise': {'raw_noise':{"mean": -3.51640656386717, "std":3.5831320474767407 }}}
+
+
+# Credit for this code goes to https://github.com/JanHuewel
+def get_string_representation_of_kernel(kernel_expression):
+    if kernel_expression._get_name() == "AdditiveKernel":
+        s = ""
+        for k in kernel_expression.kernels:
+            s += get_string_representation_of_kernel(k) + " + "
+        return "(" + s[:-3] + ")"
+    elif kernel_expression._get_name() == "AdditiveStructureKernel":
+        return get_string_representation_of_kernel(kernel_expression.base_kernel)
+    elif kernel_expression._get_name() == "ProductKernel":
+        s = ""
+        for k in kernel_expression.kernels:
+            s += get_string_representation_of_kernel(k) + " * "
+        return "(" + s[:-3] + ")"
+    elif kernel_expression._get_name() == "ScaleKernel":
+        return f"(c * {get_string_representation_of_kernel(kernel_expression.base_kernel)})"
+    elif kernel_expression._get_name() == "RBFKernel":
+        return "SE"
+    elif kernel_expression._get_name() == "LinearKernel":
+        return "LIN"
+    elif kernel_expression._get_name() == "PeriodicKernel":
+        return "PER"
+    elif kernel_expression._get_name() == "MaternKernel":
+        if kernel_expression.nu == 1.5:
+            return "MAT32"
+        elif kernel_expression.nu == 2.5:
+            return "MAT52"
+        else:
+            raise "shit"
+    elif kernel_expression._get_name() == "RQKernel":
+        return "RQ"
+    elif kernel_expression._get_name() == "AffineKernel":
+        return "AFF"
+    else:
+        return kernel_expression._get_name()
+
+
+# Credit for this code goes to https://github.com/JanHuewel
+def get_full_kernels_in_kernel_expression(kernel_expression):
+    """
+    returns list of all base kernels in a kernel expression
+    """
+    kernel_list = list()
+    if kernel_expression == None:
+        return kernel_list
+    if hasattr(kernel_expression, "kernels"):
+        for kernel in kernel_expression.kernels:
+            kernel_list.extend(get_full_kernels_in_kernel_expression(kernel))
+    elif kernel_expression._get_name() in ["ScaleKernel", "GridKernel"]:
+        kernel_list.extend([kernel_expression._get_name()])
+        kernel_list.extend(get_full_kernels_in_kernel_expression(
+            kernel_expression.base_kernel))
+    elif kernel_expression._get_name() in ["AdditiveStructureKernel"]:
+        kernel_list.extend(get_full_kernels_in_kernel_expression(
+            kernel_expression.base_kernel))
+    else:
+        kernel_list.append(kernel_expression._get_name())
+    return kernel_list
+
+
+def prior_distribution(model, prior_dict=None, uninformed=False):
+    if not prior_dict:
+        if uninformed:
+            prior_dict = uninformed_prior_dict
+        else:
+            prior_dict = informed_prior_dict
+
+    variances_list = list()
+    debug_param_name_list = list()
+    theta_mu = list()
+    params = None 
+    covar_string = get_string_representation_of_kernel(model.covar_module)
+    covar_string = covar_string.replace("(", "")
+    covar_string = covar_string.replace(")", "")
+    covar_string = covar_string.replace(" ", "")
+    covar_string = covar_string.replace("PER", "PER+PER")
+    covar_string = covar_string.replace("RQ", "RQ+RQ")
+    covar_string_list = [s.split("*") for s in covar_string.split("+")]
+    covar_string_list.insert(0, ["LIKELIHOOD"])
+    covar_string_list = list(itertools.chain.from_iterable(covar_string_list))
+    both_PER_params = False
+    for (param_name, param), cov_str in zip(model.named_parameters(), covar_string_list):
+        if params == None:
+            params = param
+        else:
+            if len(param.shape)==0:
+                params = torch.cat((params,param.unsqueeze(0)))
+            elif len(param.shape)==1:
+                params = torch.cat((params,param))
+            else:
+                params = torch.cat((params,param.squeeze(0)))
+        debug_param_name_list.append(param_name)
+        curr_mu = None
+        curr_var = None
+        # First param is (always?) noise and is always with the likelihood
+        if "likelihood" in param_name:
+            curr_mu = prior_dict["noise"]["raw_noise"]["mean"]
+            curr_var = prior_dict["noise"]["raw_noise"]["std"]
+        else:
+            if (cov_str == "PER" or cov_str == "RQ") and not both_PER_params:
+                curr_mu = prior_dict[cov_str][param_name.split(".")[-1]]["mean"]
+                curr_var = prior_dict[cov_str][param_name.split(".")[-1]]["std"]
+                both_PER_params = True
+            elif (cov_str == "PER" or cov_str == "RQ") and both_PER_params:
+                curr_mu = prior_dict[cov_str][param_name.split(".")[-1]]["mean"]
+                curr_var = prior_dict[cov_str][param_name.split(".")[-1]]["std"]
+                both_PER_params = False
+            else:
+                try:
+                    curr_mu = prior_dict[cov_str][param_name.split(".")[-1]]["mean"]
+                    curr_var = prior_dict[cov_str][param_name.split(".")[-1]]["std"]
+                except Exception as E:
+                    import pdb
+                    pdb.set_trace()
+                    prev_cov = cov_str
+        theta_mu.append(curr_mu)
+        variances_list.append(curr_var)
+    theta_mu = torch.tensor(theta_mu)
+    theta_mu = theta_mu.unsqueeze(0).t()
+    sigma = torch.diag(torch.Tensor(variances_list))
+    variance = sigma@sigma
+    return theta_mu, variance
+
+
+def log_normalized_prior(model, theta_mu=None, sigma=None, uninformed=False):
+    theta_mu, sigma = prior_distribution(model, uninformed=uninformed) if theta_mu is None or sigma is None else (theta_mu, sigma)
+    prior = torch.distributions.MultivariateNormal(theta_mu.t(), sigma)
+
+    params = None
+    for (_, param) in model.named_parameters():
+        if params == None:
+            params = param
+        else:
+            if len(param.shape)==0:
+                params = torch.cat((params, param.unsqueeze(0)))
+            elif len(param.shape)==1:
+                params = torch.cat((params, param))
+            else:
+                params = torch.cat((params, param.squeeze(0)))
+ 
+    # for convention reasons I'm diving by the number of datapoints
+    log_prob = prior.log_prob(params) / len(*model.train_inputs)
+    return log_prob.squeeze(0)
