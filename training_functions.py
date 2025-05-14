@@ -30,25 +30,25 @@ parameter_priors = {
 
 
 kernel_param_specs = {
-    ("RBFKernel", "lengthscale"): {"bounds": (1e-2, 5.0)}, # add ', "type": "uniform"},' # to use uniform distribution
-    ("MaternKernel", "lengthscale"): {"bounds": (1e-2, 1.0)},
-    ("LinearKernel", "variance"): {"bounds": (1e-4, 1.0)},
-    ("AffineKernel", "variance"): {"bounds": (1e-4, 1.0)},
-    ("RQKernel", "lengthscale"): {"bounds": (1e-3, 1.0)},
-    ("RQKernel", "alpha"): {"bounds": (1e-3, 1.0)},
+    ("RBFKernel", "lengthscale"): {"bounds": (1e-1, 5.0)}, # add ', "type": "uniform"},' # to use uniform distribution
+    ("MaternKernel", "lengthscale"): {"bounds": (1e-1, 1.0)},
+    ("LinearKernel", "variance"): {"bounds": (1e-1, 1.0)},
+    ("AffineKernel", "variance"): {"bounds": (1e-1, 1.0)},
+    ("RQKernel", "lengthscale"): {"bounds": (1e-1, 1.0)},
+    ("RQKernel", "alpha"): {"bounds": (1e-1, 1.0)},
     ("CosineKernel", "period_length"): {"bounds": (1e-1, 10.0), "type": "uniform"},
-    ("PeriodicKernel", "lengthscale"): {"bounds": (1e-3, 5.0)},
+    ("PeriodicKernel", "lengthscale"): {"bounds": (1e-1, 5.0)},
     ("PeriodicKernel", "period_length"): {"bounds": (1e-1, 10.0), "type": "uniform"},
-    ("ScaleKernel", "outputscale"): {"bounds": (1e-3, 10.0)},
+    ("ScaleKernel", "outputscale"): {"bounds": (1e-1, 10.0)},
     #("LODE_Kernel", "signal_variance_2_0"): {"bounds": (0.05, 0.5)},  # full match
-    ("LODE_Kernel", "signal_variance"): {"bounds": (1e-2, 10)},  # base
-    ("LODE_Kernel", "lengthscale"): {"bounds": (1e-2, 5.0)},           
+    ("LODE_Kernel", "signal_variance"): {"bounds": (1e-1, 10)},  # base
+    ("LODE_Kernel", "lengthscale"): {"bounds": (1e-1, 5.0)},           
 }
 
 
 param_specs = {
-    "likelihood.raw_task_noises": {"bounds": (1e-3, 1e-0)},
-    "likelihood.raw_noise": {"bounds": (1e-3, 1e-0)}
+    "likelihood.raw_task_noises": {"bounds": (1e-1, 1e-0)},
+    "likelihood.raw_noise": {"bounds": (1e-1, 1e-0)}
 }
 
 
@@ -233,7 +233,7 @@ def granso_optimization(model, likelihood, train_x, train_y, **kwargs):
         except Exception as E:
             print("LOG ERROR: Severe PyGRANSO issue. Loss is inf+0")
             print(f"LOG ERROR: {E}")
-            loss = torch.tensor(np.finfo(np.float32).max, requires_grad=True) + torch.tensor(0)
+            loss = torch.tensor(np.finfo(np.float32).max, requires_grad=True) + torch.tensor(-10.0)
         if MAP:
             # log_normalized_prior is in metrics.py 
             log_p = log_normalized_prior(model, param_specs=parameter_priors, kernel_param_specs=kernel_parameter_priors)
@@ -246,6 +246,9 @@ def granso_optimization(model, likelihood, train_x, train_y, **kwargs):
     best_likelihood_state_dict = likelihood.state_dict()
 
     best_f = np.inf
+
+    all_state_dicts_likelihoods_losses = []
+
     for restart in range(random_restarts):
         if verbose:
             print("---")
@@ -261,27 +264,45 @@ def granso_optimization(model, likelihood, train_x, train_y, **kwargs):
             pdb.set_trace()
             pass
 
+        all_state_dicts_likelihoods_losses.append((model.state_dict(), likelihood.state_dict(), soln.final.f))
         if soln.final.f < best_f:
             if verbose:
                 print(f"LOG: Found new best solution: {soln.final.f}")
             best_f = soln.final.f
             best_model_state_dict = model.state_dict()
             best_likelihood_state_dict = likelihood.state_dict()
-        # TODO make proper by passing the bounds
         randomize_model_hyperparameters(model, param_specs=param_specs, kernel_param_specs=kernel_param_specs, verbose=True)
         opts.x0 = torch.nn.utils.parameters_to_vector(model.parameters()).detach().reshape(nvar,1)
 
     model.load_state_dict(best_model_state_dict)
     likelihood.load_state_dict(best_likelihood_state_dict)
-    if verbose:
-        print(f"----")
-        print(f"Final best parameters: {list(model.named_parameters())} w. loss: {best_f} (smaller=better)")
-        print(f"----")
 
-    loss = -mll_fkt(model(train_x), train_y)
-    if MAP:
-        log_p = log_normalized_prior(model, param_specs=parameter_priors, kernel_param_specs=kernel_parameter_priors)
-        loss -= log_p
+    try:
+        loss = -mll_fkt(model(train_x), train_y)
+        if MAP:
+            log_p = log_normalized_prior(model, param_specs=parameter_priors, kernel_param_specs=kernel_parameter_priors)
+            loss -= log_p
+        if verbose:
+            print(f"----")
+            print(f"Final best parameters: {list(model.named_parameters())} w. loss: {best_f} (smaller=better)")
+            print(f"----")
+    except Exception as E:
+        print(f"LOG ERROR: Error after training: {E}")
+    for state_dict, likelihood_state_dict, loss in sorted(all_state_dicts_likelihoods_losses, key=lambda x: x[2]):
+        model.load_state_dict(state_dict)
+        likelihood.load_state_dict(likelihood_state_dict)
+        try:
+            loss = -mll_fkt(model(train_x), train_y)
+            if MAP:
+                log_p = log_normalized_prior(model, param_specs=parameter_priors, kernel_param_specs=kernel_parameter_priors)
+                loss -= log_p
+            if verbose:
+                print(f"----")
+                print(f"Final best parameters: {list(model.named_parameters())} w. loss: {best_f} (smaller=better)")
+                print(f"----")
+            break
+        except Exception:
+            continue
     
     # Return the trained model
     return loss, model, likelihood, get_log_fn()
