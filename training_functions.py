@@ -7,6 +7,28 @@ from pygranso.private.getNvar import getNvarTorch
 import torch
 
 
+kernel_parameter_priors = {
+    ("RBFKernel", "lengthscale"): {"mean": 0.0, "std": 10.0}, 
+    ("MaternKernel", "lengthscale"): {"mean": 0.0, "std": 10.0},
+    ("LinearKernel", "variance"): {"mean": 0.0, "std": 10.0},
+    ("AffineKernel", "variance"): {"mean": 0.0, "std": 10.0},
+    ("RQKernel", "lengthscale"): {"mean": 0.0, "std": 10.0},
+    ("RQKernel", "alpha"): {"mean": 0.0, "std": 10.0},
+    ("CosineKernel", "period_length"): {"mean": 0.0, "std": 10.0},
+    ("PeriodicKernel", "lengthscale"): {"mean": 0.0, "std": 10.0},
+    ("PeriodicKernel", "period_length"): {"mean": 0.0, "std": 10.0},
+    ("ScaleKernel", "outputscale"): {"mean": 0.0, "std": 10.0},
+    ("LODE_Kernel", "signal_variance_2_0"): {"mean": 0.0, "std": 10.0},  # full match
+    ("LODE_Kernel", "lengthscale"): {"mean": 0.0, "std": 10.0},           # base fallback
+}
+
+
+parameter_priors = {
+    "likelihood.raw_task_noises": {"mean": 0.0, "std": 10.0},
+    "likelihood.raw_noise": {"mean": 0.0, "std": 10.0}
+}
+
+
 kernel_param_specs = {
     ("RBFKernel", "lengthscale"): {"bounds": (1e-3, 5.0)}, # add ', "type": "uniform"},' # to use uniform distribution
     ("MaternKernel", "lengthscale"): {"bounds": (1e-3, 1.0)},
@@ -213,7 +235,7 @@ def granso_optimization(model, likelihood, train_x, train_y, **kwargs):
             loss = torch.tensor(np.inf, requires_grad=True) + torch.tensor(0)
         if MAP:
             # log_normalized_prior is in metrics.py 
-            log_p = log_normalized_prior(model, uninformed=uninformed)
+            log_p = log_normalized_prior(model, param_specs=parameter_priors, kernel_param_specs=kernel_parameter_priors)
             # negative scaled MAP
             loss -= log_p
         #print(f"LOG: {loss}")
@@ -257,7 +279,7 @@ def granso_optimization(model, likelihood, train_x, train_y, **kwargs):
 
     loss = -mll_fkt(model(train_x), train_y)
     if MAP:
-        log_p = log_normalized_prior(model, uninformed=uninformed)
+        log_p = log_normalized_prior(model, param_specs=parameter_priors, kernel_param_specs=kernel_parameter_priors)
         loss -= log_p
     
     # Return the trained model

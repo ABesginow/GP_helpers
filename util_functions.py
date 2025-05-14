@@ -181,72 +181,99 @@ def get_full_kernels_in_kernel_expression(kernel_expression):
     return kernel_list
 
 
-def prior_distribution(model, prior_dict=None, uninformed=False):
-    if not prior_dict:
-        if uninformed:
-            prior_dict = uninformed_prior_dict
-        else:
-            prior_dict = informed_prior_dict
 
-    variances_list = list()
-    debug_param_name_list = list()
-    theta_mu = list()
-    params = None 
-    covar_string = get_string_representation_of_kernel(model.covar_module)
-    covar_string = covar_string.replace("(", "")
-    covar_string = covar_string.replace(")", "")
-    covar_string = covar_string.replace(" ", "")
-    covar_string = covar_string.replace("PER", "PER+PER")
-    covar_string = covar_string.replace("RQ", "RQ+RQ")
-    covar_string_list = [s.split("*") for s in covar_string.split("+")]
-    covar_string_list.insert(0, ["LIKELIHOOD"])
-    covar_string_list = list(itertools.chain.from_iterable(covar_string_list))
-    both_PER_params = False
-    for (param_name, param), cov_str in zip(model.named_parameters(), covar_string_list):
-        if params == None:
-            params = param
-        else:
-            if len(param.shape)==0:
-                params = torch.cat((params,param.unsqueeze(0)))
-            elif len(param.shape)==1:
-                params = torch.cat((params,param))
-            else:
-                params = torch.cat((params,param.squeeze(0)))
-        debug_param_name_list.append(param_name)
-        curr_mu = None
-        curr_var = None
-        # First param is (always?) noise and is always with the likelihood
-        if "likelihood" in param_name:
-            curr_mu = prior_dict["noise"]["raw_noise"]["mean"]
-            curr_var = prior_dict["noise"]["raw_noise"]["std"]
-        else:
-            if (cov_str == "PER" or cov_str == "RQ") and not both_PER_params:
-                curr_mu = prior_dict[cov_str][param_name.split(".")[-1]]["mean"]
-                curr_var = prior_dict[cov_str][param_name.split(".")[-1]]["std"]
-                both_PER_params = True
-            elif (cov_str == "PER" or cov_str == "RQ") and both_PER_params:
-                curr_mu = prior_dict[cov_str][param_name.split(".")[-1]]["mean"]
-                curr_var = prior_dict[cov_str][param_name.split(".")[-1]]["std"]
-                both_PER_params = False
-            else:
-                try:
-                    curr_mu = prior_dict[cov_str][param_name.split(".")[-1]]["mean"]
-                    curr_var = prior_dict[cov_str][param_name.split(".")[-1]]["std"]
-                except Exception as E:
-                    import pdb
-                    pdb.set_trace()
-                    prev_cov = cov_str
-        theta_mu.append(curr_mu)
-        variances_list.append(curr_var)
-    theta_mu = torch.tensor(theta_mu)
-    theta_mu = theta_mu.unsqueeze(0).t()
-    sigma = torch.diag(torch.Tensor(variances_list))
-    variance = sigma@sigma
-    return theta_mu, variance
+def get_param_spec(
+    param_name,
+    kernel_name,
+    param_specs=None,
+    kernel_param_specs=None,
+    default_spec=None
+):
+    """
+    Resolves a parameter spec using full name match, kernel+param, or fuzzy match for LODE_Kernel.
+
+    Returns:
+    - spec dict (e.g., {"bounds": (a, b), "type": ..., "mean": ..., "variance": ...})
+    """
+    param_specs = param_specs or {}
+    kernel_param_specs = kernel_param_specs or {}
+    default_spec = default_spec or {}
+
+    # 1. Full name override
+    if param_name in param_specs:
+        return param_specs[param_name]
+
+    # 2. Kernel + parameter
+    if (kernel_name, param_name) in kernel_param_specs:
+        return kernel_param_specs[(kernel_name, param_name)]
+
+    # 3. Fuzzy base-key match for LODE_Kernel
+    if kernel_name == "LODE_Kernel":
+        for base_key in ["lengthscale", "signal_variance"]:
+            if base_key in param_name:
+                if (kernel_name, base_key) in kernel_param_specs:
+                    return kernel_param_specs[(kernel_name, base_key)]
+
+    # 4. Fallback
+    return default_spec
 
 
-def log_normalized_prior(model, theta_mu=None, sigma=None, uninformed=False):
-    theta_mu, sigma = prior_distribution(model, uninformed=uninformed) if theta_mu is None or sigma is None else (theta_mu, sigma)
+def prior_distribution(
+    model,
+    param_specs=None,
+    kernel_param_specs=None,
+    default_mean=0.0,
+    default_std=1.0
+):
+    """
+    Collects prior parameters (mean, variance) for all named hyperparameters in the model.
+
+    Returns:
+    - List of tuples: (param_name, tensor, mean, variance)
+    """
+    mean_values = []
+    std_values = []
+    kernel_types = get_full_kernels_in_kernel_expression(model.covar_module)
+    kernel_index = 0
+
+    for name, _ in model.named_hyperparameters():
+
+        if name in param_specs:
+            kernel_type = "<explicit>"
+        elif "LODE_Kernel" in kernel_types:
+            kernel_type = "LODE_Kernel"
+        else:
+            kernel_type = kernel_types[kernel_index] if kernel_index < len(kernel_types) else "<unknown>"
+            kernel_index += 1
+
+        spec = get_param_spec(
+            name,
+            kernel_type,
+            param_specs=param_specs,
+            kernel_param_specs=kernel_param_specs,
+            default_spec={"mean": default_mean, "std": default_std}
+        )
+        
+        # Catching special cases where parameters are vectors
+        # MultitaskGPs have an independent noise for each task
+        if name == "likelihood.raw_task_noises":
+            mean_values.extend([spec["mean"] for _ in range(model.num_tasks)])
+            std_values.extend([spec["std"] for _ in range(model.num_tasks)])
+        # These are also ARD Kernels, which I usually don't care about, that have the same issue
+        else:
+            mean_values.append(spec["mean"])
+            std_values.append(spec["std"])
+
+    return mean_values, std_values
+
+
+def log_normalized_prior(model, param_specs, kernel_param_specs, theta_mu=None, sigma=None):
+    theta_mu, sigma = prior_distribution(model, param_specs=param_specs, kernel_param_specs=kernel_param_specs) if theta_mu is None or sigma is None else (theta_mu, sigma)
+    if not type(theta_mu) == torch.Tensor:
+        theta_mu = torch.tensor(theta_mu)
+    if not type(sigma) == torch.Tensor:
+        sigma = torch.tensor(sigma)
+        sigma = torch.diag(sigma)
     prior = torch.distributions.MultivariateNormal(theta_mu.t(), sigma)
 
     params = None
