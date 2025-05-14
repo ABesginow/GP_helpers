@@ -242,11 +242,6 @@ def granso_optimization(model, likelihood, train_x, train_y, **kwargs):
         #print(f"LOG: {loss}")
         return [loss, None, None]
 
-    best_model_state_dict = model.state_dict()
-    best_likelihood_state_dict = likelihood.state_dict()
-
-    best_f = np.inf
-
     all_state_dicts_likelihoods_losses = []
 
     for restart in range(random_restarts):
@@ -265,29 +260,9 @@ def granso_optimization(model, likelihood, train_x, train_y, **kwargs):
             pass
 
         all_state_dicts_likelihoods_losses.append((model.state_dict(), likelihood.state_dict(), soln.final.f))
-        if soln.final.f < best_f:
-            if verbose:
-                print(f"LOG: Found new best solution: {soln.final.f}")
-            best_f = soln.final.f
-            best_model_state_dict = model.state_dict()
-            best_likelihood_state_dict = likelihood.state_dict()
         randomize_model_hyperparameters(model, param_specs=param_specs, kernel_param_specs=kernel_param_specs, verbose=True)
         opts.x0 = torch.nn.utils.parameters_to_vector(model.parameters()).detach().reshape(nvar,1)
 
-    model.load_state_dict(best_model_state_dict)
-    likelihood.load_state_dict(best_likelihood_state_dict)
-
-    try:
-        loss = -mll_fkt(model(train_x), train_y)
-        if MAP:
-            log_p = log_normalized_prior(model, param_specs=parameter_priors, kernel_param_specs=kernel_parameter_priors)
-            loss -= log_p
-        if verbose:
-            print(f"----")
-            print(f"Final best parameters: {list(model.named_parameters())} w. loss: {best_f} (smaller=better)")
-            print(f"----")
-    except Exception as E:
-        print(f"LOG ERROR: Error after training: {E}")
     for state_dict, likelihood_state_dict, loss in sorted(all_state_dicts_likelihoods_losses, key=lambda x: x[2]):
         model.load_state_dict(state_dict)
         likelihood.load_state_dict(likelihood_state_dict)
@@ -298,7 +273,7 @@ def granso_optimization(model, likelihood, train_x, train_y, **kwargs):
                 loss -= log_p
             if verbose:
                 print(f"----")
-                print(f"Final best parameters: {list(model.named_parameters())} w. loss: {best_f} (smaller=better)")
+                print(f"Final best parameters: {list(model.named_parameters())} w. loss: {loss} (smaller=better)")
                 print(f"----")
             break
         except Exception:
