@@ -30,8 +30,8 @@ parameter_priors = {
 
 
 kernel_param_specs = {
-    ("RBFKernel", "lengthscale"): {"bounds": (1e-3, 5.0)}, # add ', "type": "uniform"},' # to use uniform distribution
-    ("MaternKernel", "lengthscale"): {"bounds": (1e-3, 1.0)},
+    ("RBFKernel", "lengthscale"): {"bounds": (1e-2, 5.0)}, # add ', "type": "uniform"},' # to use uniform distribution
+    ("MaternKernel", "lengthscale"): {"bounds": (1e-2, 1.0)},
     ("LinearKernel", "variance"): {"bounds": (1e-4, 1.0)},
     ("AffineKernel", "variance"): {"bounds": (1e-4, 1.0)},
     ("RQKernel", "lengthscale"): {"bounds": (1e-3, 1.0)},
@@ -41,14 +41,14 @@ kernel_param_specs = {
     ("PeriodicKernel", "period_length"): {"bounds": (1e-1, 10.0), "type": "uniform"},
     ("ScaleKernel", "outputscale"): {"bounds": (1e-3, 10.0)},
     #("LODE_Kernel", "signal_variance_2_0"): {"bounds": (0.05, 0.5)},  # full match
-    ("LODE_Kernel", "signal_variance"): {"bounds": (1e-3, 10)},  # base
-    ("LODE_Kernel", "lengthscale"): {"bounds": (1e-3, 5.0)},           
+    ("LODE_Kernel", "signal_variance"): {"bounds": (1e-2, 10)},  # base
+    ("LODE_Kernel", "lengthscale"): {"bounds": (1e-2, 5.0)},           
 }
 
 
 param_specs = {
-    "likelihood.raw_task_noises": {"bounds": (1e-4, 1e-0)},
-    "likelihood.raw_noise": {"bounds": (1e-4, 1e-0)}
+    "likelihood.raw_task_noises": {"bounds": (1e-3, 1e-0)},
+    "likelihood.raw_noise": {"bounds": (1e-3, 1e-0)}
 }
 
 
@@ -233,7 +233,7 @@ def granso_optimization(model, likelihood, train_x, train_y, **kwargs):
         except Exception as E:
             print("LOG ERROR: Severe PyGRANSO issue. Loss is inf+0")
             print(f"LOG ERROR: {E}")
-            loss = torch.tensor(np.inf, requires_grad=True) + torch.tensor(0)
+            loss = torch.tensor(np.finfo(np.float32).max, requires_grad=True) + torch.tensor(0)
         if MAP:
             # log_normalized_prior is in metrics.py 
             log_p = log_normalized_prior(model, param_specs=parameter_priors, kernel_param_specs=kernel_parameter_priors)
