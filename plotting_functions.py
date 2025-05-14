@@ -147,6 +147,7 @@ def plot_single_input_gp_posterior(
     Y_pred_mean = np.asarray(Y_pred_mean)
     Y_pred_var = np.asarray(Y_pred_var)
 
+    # I guess this makes the calls consistent with MOGP cases?
     if Y_train.ndim == 1:
         Y_train = Y_train[:, np.newaxis]
     if Y_pred_mean.ndim == 1:

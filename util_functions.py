@@ -223,7 +223,7 @@ def prior_distribution(
     param_specs=None,
     kernel_param_specs=None,
     default_mean=0.0,
-    default_std=1.0
+    default_std=10.0
 ):
     """
     Collects prior parameters (mean, variance) for all named hyperparameters in the model.
