@@ -40,8 +40,9 @@ kernel_param_specs = {
     ("PeriodicKernel", "lengthscale"): {"bounds": (1e-3, 5.0)},
     ("PeriodicKernel", "period_length"): {"bounds": (1e-1, 10.0), "type": "uniform"},
     ("ScaleKernel", "outputscale"): {"bounds": (1e-3, 10.0)},
-    ("LODE_Kernel", "signal_variance_2_0"): {"bounds": (0.05, 0.5)},  # full match
-    ("LODE_Kernel", "lengthscale"): {"bounds": (0.2, 4.0)},           # base fallback
+    #("LODE_Kernel", "signal_variance_2_0"): {"bounds": (0.05, 0.5)},  # full match
+    ("LODE_Kernel", "signal_variance"): {"bounds": (1e-3, 10)},  # base
+    ("LODE_Kernel", "lengthscale"): {"bounds": (1e-3, 5.0)},           
 }
 
 

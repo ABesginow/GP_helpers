@@ -2,17 +2,6 @@ import itertools
 import torch
 import numpy as np
 
-uninformed_prior_dict = {'SE': {'raw_lengthscale' : {"mean": 0. , "std":10.}},
-                  'MAT52': {'raw_lengthscale' :{"mean": 0., "std":10. } },
-                  'MAT32': {'raw_lengthscale' :{"mean": 0., "std":10. } },
-                  'RQ': {'raw_lengthscale' :{"mean": 0., "std":10. },
-                          'raw_alpha' :{"mean": 0., "std":10. } },
-                  'PER':{'raw_lengthscale':{"mean": 0., "std":10. },
-                          'raw_period_length':{"mean": 0., "std":10. } },
-                  'LIN':{'raw_variance' :{"mean": 0., "std":10. } },
-                  'AFF':{'raw_variance' :{"mean": 0., "std":10. } },
-                  'c':{'raw_outputscale':{"mean": 0., "std":10. } },
-                  'noise': {'raw_noise':{"mean": 0., "std":10. }}}
 
 # An empirically derived prior for the parameters of the kernels
 informed_prior_dict = {'SE': {'raw_lengthscale' : {"mean": -0.21221139138922668 , "std":1.8895426067756804}},
@@ -72,6 +61,11 @@ def sample_value(shape, bounds, dist_type):
         return torch.tensor(
             np.exp(np.random.uniform(*log_bounds, size=shape)), dtype=torch.float32
         )
+    elif dist_type == "log":
+        log_bounds = np.log(bounds)
+        return torch.tensor(
+            np.random.uniform(*log_bounds, size=shape), dtype=torch.float32
+        )
     elif dist_type == "uniform":
         return torch.tensor(
             np.random.uniform(*bounds, size=shape), dtype=torch.float32
@@ -106,7 +100,7 @@ def randomize_model_hyperparameters(
     param_specs=None,
     kernel_param_specs=None,
     default_bounds=(0.1, 1.0),
-    default_type="log-uniform",
+    default_type="log",
     verbose=False
 ):
     param_specs = param_specs or {}
