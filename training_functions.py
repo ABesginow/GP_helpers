@@ -1,4 +1,4 @@
-from .util_functions import log_normalized_prior, get_full_kernels_in_kernel_expression
+from .util_functions import log_normalized_prior, get_full_kernels_in_kernel_expression, randomize_model_hyperparameters
 import gpytorch
 import numpy as np
 from pygranso.pygranso import pygranso
@@ -7,39 +7,26 @@ from pygranso.private.getNvar import getNvarTorch
 import torch
 
 
-hyperparameter_limits = {"RBFKernel": {"lengthscale": [1e-3,5]},
-                         "MaternKernel": {"lengthscale": [1e-3,1]},
-                         "LinearKernel": {"variance": [1e-4,1]},
-                         "AffineKernel": {"variance": [1e-4,1]},
-                         "RQKernel": {"lengthscale": [1e-3,1],
-                                      "alpha": [1e-3,1]},
-                         "CosineKernel": {"period_length": [1e-3,3]},
-                         "PeriodicKernel": {"lengthscale": [1e-3,5],
-                                            "period_length": [1e-1,10]},
-                         "ScaleKernel": {"outputscale": [1e-3,10]},
-                         "Noise": [1e-3, 1],
-                         "MyPeriodKernel":{"period_length": [1e-3,3]}}
+kernel_param_specs = {
+    ("RBFKernel", "lengthscale"): {"bounds": (1e-3, 5.0)}, # add ', "type": "uniform"},' # to use uniform distribution
+    ("MaternKernel", "lengthscale"): {"bounds": (1e-3, 1.0)},
+    ("LinearKernel", "variance"): {"bounds": (1e-4, 1.0)},
+    ("AffineKernel", "variance"): {"bounds": (1e-4, 1.0)},
+    ("RQKernel", "lengthscale"): {"bounds": (1e-3, 1.0)},
+    ("RQKernel", "alpha"): {"bounds": (1e-3, 1.0)},
+    ("CosineKernel", "period_length"): {"bounds": (1e-1, 10.0), "type": "uniform"},
+    ("PeriodicKernel", "lengthscale"): {"bounds": (1e-3, 5.0)},
+    ("PeriodicKernel", "period_length"): {"bounds": (1e-1, 10.0), "type": "uniform"},
+    ("ScaleKernel", "outputscale"): {"bounds": (1e-3, 10.0)},
+    ("LODE_Kernel", "signal_variance_2_0"): {"bounds": (0.05, 0.5)},  # full match
+    ("LODE_Kernel", "lengthscale"): {"bounds": (0.2, 4.0)},           # base fallback
+}
 
 
-def random_reinit(model, logarithmic=False):
-    #print("Random reparameterization")
-    #print("old parameters: ", list(model.named_parameters()))
-    model_params = model.parameters()
-    relevant_hyper_limits = list()
-    relevant_hyper_limits.append(hyperparameter_limits["Noise"])
-    kernel_name_list = [kernel for kernel in get_full_kernels_in_kernel_expression(model.covar_module)]
-    for kernel in kernel_name_list:
-        for param_name in hyperparameter_limits[kernel]:
-            relevant_hyper_limits.append(hyperparameter_limits[kernel][param_name])
-
-    for _, (param, limit) in enumerate(zip(model_params, relevant_hyper_limits)):
-        param_name = limit
-        if logarithmic:
-            new_param_value = torch.rand_like(param)* (torch.log(torch.tensor(limit[1])) - torch.log(torch.tensor(limit[0]))) + torch.log(torch.tensor(limit[0]))
-        else:
-            new_param_value = torch.rand_like(param)* (limit[1] - limit[0]) + limit[0]
-        param.data = new_param_value
-    #print("new parameters: ", list(model.named_parameters()))
+param_specs = {
+    "likelihood.raw_task_noises": {"bounds": (1e-4, 1e-0)},
+    "likelihood.raw_noise": {"bounds": (1e-4, 1e-0)}
+}
 
 
 def fixed_reinit(model, parameters: torch.tensor) -> None:
@@ -257,7 +244,8 @@ def granso_optimization(model, likelihood, train_x, train_y, **kwargs):
             best_f = soln.final.f
             best_model_state_dict = model.state_dict()
             best_likelihood_state_dict = likelihood.state_dict()
-        random_reinit(model, logarithmic=logarithmic_reinit)
+        # TODO make proper by passing the bounds
+        randomize_model_hyperparameters(model, param_specs=param_specs, kernel_param_specs=kernel_param_specs, verbose=True)
         opts.x0 = torch.nn.utils.parameters_to_vector(model.parameters()).detach().reshape(nvar,1)
 
     model.load_state_dict(best_model_state_dict)

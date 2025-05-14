@@ -106,7 +106,7 @@ def randomize_model_hyperparameters(
     param_specs=None,
     kernel_param_specs=None,
     default_bounds=(0.1, 1.0),
-    default_type="uniform",
+    default_type="log-uniform",
     verbose=False
 ):
     param_specs = param_specs or {}
