@@ -1,5 +1,6 @@
 import itertools
 import torch
+import numpy as np
 
 uninformed_prior_dict = {'SE': {'raw_lengthscale' : {"mean": 0. , "std":10.}},
                   'MAT52': {'raw_lengthscale' :{"mean": 0., "std":10. } },
@@ -62,6 +63,99 @@ def get_string_representation_of_kernel(kernel_expression):
         return "AFF"
     else:
         return kernel_expression._get_name()
+
+
+def sample_value(shape, bounds, dist_type):
+    """Sample values from a given distribution type."""
+    if dist_type == "log-uniform":
+        log_bounds = np.log(bounds)
+        return torch.tensor(
+            np.exp(np.random.uniform(*log_bounds, size=shape)), dtype=torch.float32
+        )
+    elif dist_type == "uniform":
+        return torch.tensor(
+            np.random.uniform(*bounds, size=shape), dtype=torch.float32
+        )
+    else:
+        raise ValueError(f"Unsupported distribution type: {dist_type}")
+
+
+def match_lode_parameter_spec(param_name, kernel_param_specs, default_bounds, default_type):
+    """
+    Match a LODE_Kernel parameter name to a kernel_param_specs entry.
+
+    Looks for:
+    - exact match
+    - base match (e.g., "lengthscale" in "lengthscale_2")
+    """
+    if ("LODE_Kernel", param_name) in kernel_param_specs:
+        spec = kernel_param_specs[("LODE_Kernel", param_name)]
+        return spec.get("bounds", default_bounds), spec.get("type", default_type)
+
+    for base_key in ["lengthscale", "signal_variance"]:
+        if base_key in param_name:
+            if ("LODE_Kernel", base_key) in kernel_param_specs:
+                spec = kernel_param_specs[("LODE_Kernel", base_key)]
+                return spec.get("bounds", default_bounds), spec.get("type", default_type)
+
+    return default_bounds, default_type
+
+
+def randomize_model_hyperparameters(
+    model,
+    param_specs=None,
+    kernel_param_specs=None,
+    default_bounds=(0.1, 1.0),
+    default_type="uniform",
+    verbose=False
+):
+    param_specs = param_specs or {}
+    kernel_param_specs = kernel_param_specs or {}
+
+    # Step 1: Get kernel types in order
+    kernel_types = get_full_kernels_in_kernel_expression(model.covar_module)
+    kernel_index = 0
+
+    for name, param in model.named_hyperparameters():
+        shape = param.shape
+
+        # Case 1: Full-name match
+        if name in param_specs:
+            spec = param_specs[name]
+            bounds = spec.get("bounds", default_bounds)
+            dist_type = spec.get("type", default_type)
+            kernel_type = name
+
+        # Case 2: LODE_Kernel param in ParameterDict
+        elif "LODE_Kernel" in kernel_types:
+            # Extract the innermost param name
+            local_param_name = name.split(".")[-1]
+            bounds, dist_type = match_lode_parameter_spec(
+                local_param_name, kernel_param_specs, default_bounds, default_type
+            )
+            kernel_type = "LODE_Kernel"
+
+        # Case 3: Kernel-based fallback (sequential assignment)
+        else:
+            local_param_name = name.split(".")[-1]
+            if kernel_index < len(kernel_types):
+                kernel_type = kernel_types[kernel_index]
+                kernel_index += 1
+                spec = kernel_param_specs.get((kernel_type, local_param_name), {})
+                bounds = spec.get("bounds", default_bounds)
+                dist_type = spec.get("type", default_type)
+            else:
+                kernel_type = "<unknown>"
+                bounds = default_bounds
+                dist_type = default_type
+
+        # Sample and assign
+        new_value = sample_value(shape, bounds, dist_type)
+        with torch.no_grad():
+            param.copy_(new_value)
+
+        if verbose:
+            print(f"[Reinit] {name} ← {new_value.cpu().numpy()} (kernel: {kernel_type}, dist: {dist_type}, bounds: {bounds})")
 
 
 # Credit for this code goes to https://github.com/JanHuewel
