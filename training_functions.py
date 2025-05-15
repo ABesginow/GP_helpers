@@ -99,7 +99,6 @@ def adam_optimization(model, likelihood, train_x, train_y, **kwargs):
         randomize_model_hyperparameters(model, param_specs=param_specs, kernel_param_specs=kernel_param_specs, verbose=True)
 
     for state_dict, likelihood_state_dict, loss in sorted(all_state_dicts_likelihoods_losses, key=lambda x: x[2]):
-        import pdb;pdb.set_trace()
         model.load_state_dict(state_dict)
         likelihood.load_state_dict(likelihood_state_dict)
         try:
