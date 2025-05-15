@@ -1,3 +1,4 @@
+import copy
 from .util_functions import log_normalized_prior, get_full_kernels_in_kernel_expression, randomize_model_hyperparameters
 import gpytorch
 import numpy as np
@@ -55,6 +56,66 @@ param_specs = {
 def fixed_reinit(model, parameters: torch.tensor) -> None:
     for i, (param, value) in enumerate(zip(model.parameters(), parameters)):
         param.data = torch.full_like(param.data, value)
+
+
+
+def adam_optimization(model, likelihood, train_x, train_y, **kwargs):
+
+    random_restarts = kwargs.get("random_restarts", 5)
+    MAP = kwargs.get("MAP", True)
+    verbose = kwargs.get("verbose", False)
+    iterations = kwargs.get("iterations", 100)
+    lr = kwargs.get("lr", 0.1)
+
+    # Define the negative log likelihood
+    mll_fkt = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    uninformed = kwargs.get("uninformed", False)
+    logarithmic_reinit = kwargs.get("logarithmic_reinit", False)
+
+
+    all_state_dicts_likelihoods_losses = []
+
+    for restart in range(random_restarts):
+        if verbose:
+            print("---")
+            print("start parameters: ", torch.nn.utils.parameters_to_vector(model.parameters()).detach())
+        for i in range(iterations):
+            optimizer.zero_grad()
+            loss = -mll_fkt(model(train_x), train_y)
+
+            if MAP:
+                # log_normalized_prior is in metrics.py 
+                log_p = log_normalized_prior(model, param_specs=parameter_priors, kernel_param_specs=kernel_parameter_priors)
+                # negative scaled MAP
+                loss -= log_p
+            loss.backward()
+            optimizer.step()
+
+        if verbose:
+            print(f"Restart {restart} : trained parameters: {list(model.named_parameters())}")
+
+        all_state_dicts_likelihoods_losses.append((copy.deepcopy(model.state_dict()), copy.deepcopy(likelihood.state_dict()), loss))
+        randomize_model_hyperparameters(model, param_specs=param_specs, kernel_param_specs=kernel_param_specs, verbose=True)
+
+    for state_dict, likelihood_state_dict, loss in sorted(all_state_dicts_likelihoods_losses, key=lambda x: x[2]):
+        import pdb;pdb.set_trace()
+        model.load_state_dict(state_dict)
+        likelihood.load_state_dict(likelihood_state_dict)
+        try:
+            loss = -mll_fkt(model(train_x), train_y)
+            if MAP:
+                log_p = log_normalized_prior(model, param_specs=parameter_priors, kernel_param_specs=kernel_parameter_priors)
+                loss -= log_p
+            if verbose:
+                print(f"----")
+                print(f"Final best parameters: {list(model.named_parameters())} w. loss: {loss} (smaller=better)")
+                print(f"----")
+            break
+        except Exception:
+            continue
+
+    return loss, model, likelihood, None
 
 
 # Define the PyGRANSO training loop
@@ -259,7 +320,7 @@ def granso_optimization(model, likelihood, train_x, train_y, **kwargs):
             pdb.set_trace()
             pass
 
-        all_state_dicts_likelihoods_losses.append((model.state_dict(), likelihood.state_dict(), soln.final.f))
+        all_state_dicts_likelihoods_losses.append((copy.deepcopy(model.state_dict()), copy.deepcopy(likelihood.state_dict()), soln.final.f))
         randomize_model_hyperparameters(model, param_specs=param_specs, kernel_param_specs=kernel_param_specs, verbose=True)
         opts.x0 = torch.nn.utils.parameters_to_vector(model.parameters()).detach().reshape(nvar,1)
 
