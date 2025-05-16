@@ -282,10 +282,9 @@ def log_normalized_prior(model, param_specs, kernel_param_specs, theta_mu=None, 
             else:
                 params = torch.cat((params, param.squeeze(0)))
  
-    # for convention reasons I'm diving by the number of datapoints
+    # for convention reasons I'm dividing by the number of datapoints
     log_prob = prior.log_prob(params) / len(*model.train_inputs)
     return log_prob.squeeze(0)
-
 
 
 def central_difference(f, x, h=1e-2, order=1, precision = 6):
