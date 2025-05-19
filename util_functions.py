@@ -301,3 +301,7 @@ def central_difference(f, x, h=1e-2, order=1, precision = 6):
             #return (-float(1/56)*f(x + 4*h) + float(8/315)*f(x+ 3*h) - 1/5* f(x + 2*h) + 8/5*f(x+h) - 205/72*f(x) + 8/5*f(x-h) - 1/5*f(x-2*h) + 8/315*f(x-3*h) - 1/560*f(x-4*h))/(h**2)
     elif order == 3:
         return (0.5*f(x + 2*h) - f(x + h) + f(x - h) - 0.5*f(x - 2*h))/(h**3)
+
+
+
+#def check_ode_satisfaction_error()
