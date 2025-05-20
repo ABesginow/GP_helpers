@@ -320,7 +320,7 @@ def granso_optimization(model, likelihood, train_x, train_y, **kwargs):
             pass
 
         all_state_dicts_likelihoods_losses.append((copy.deepcopy(model.state_dict()), copy.deepcopy(likelihood.state_dict()), soln.final.f))
-        randomize_model_hyperparameters(model, param_specs=param_specs, kernel_param_specs=kernel_param_specs, verbose=True)
+        randomize_model_hyperparameters(model, param_specs=param_specs, kernel_param_specs=kernel_param_specs, verbose=verbose)
         opts.x0 = torch.nn.utils.parameters_to_vector(model.parameters()).detach().reshape(nvar,1)
 
     for state_dict, likelihood_state_dict, loss in sorted(all_state_dicts_likelihoods_losses, key=lambda x: x[2]):
