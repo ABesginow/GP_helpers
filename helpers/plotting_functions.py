@@ -210,4 +210,4 @@ def plot_single_input_gp_posterior(
         plt.show()
 
     if return_fig:
-        return fig
+        return fig, ax
