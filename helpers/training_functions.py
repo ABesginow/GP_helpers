@@ -96,7 +96,7 @@ def adam_optimization(model, likelihood, train_x, train_y, **kwargs):
             print(f"Restart {restart} : trained parameters: {list(model.named_parameters())}")
 
         all_state_dicts_likelihoods_losses.append((copy.deepcopy(model.state_dict()), copy.deepcopy(likelihood.state_dict()), loss))
-        randomize_model_hyperparameters(model, param_specs=param_specs, kernel_param_specs=kernel_param_specs, verbose=True)
+        randomize_model_hyperparameters(model, param_specs=param_specs, kernel_param_specs=kernel_param_specs, verbose=verbose)
 
     for state_dict, likelihood_state_dict, loss in sorted(all_state_dicts_likelihoods_losses, key=lambda x: x[2]):
         model.load_state_dict(state_dict)
