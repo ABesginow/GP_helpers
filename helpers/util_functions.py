@@ -304,6 +304,72 @@ def central_difference(f, x, h=1e-2, order=1, precision = 6):
     elif order == 3:
         return (0.5*f(x + 2*h) - f(x + h) + f(x - h) - 0.5*f(x - 2*h))/(h**3)
 
+def extract_differential_polynomial_terms(expr, diff_var, var_dict):
+    # Only if I calculate the ODE satisfaction errors require the sagemath library
+    from sage.all import *
+    import sage
+    #https://ask.sagemath.org/question/41204/getting-my-own-module-to-work-in-sage/
+    from sage.calculus.var import var
+    """
+    Parses a polynomial expression in the differential operator variable (e.g., x),
+    and returns a dict mapping derivative order to coefficient.
+
+    Parameters:
+    - expr: Sage symbolic expression (e.g., x^2 + 981/100)
+    - diff_var: the Sage variable representing the differential operator (e.g., x)
+
+    Returns:
+    - dict: {order: coefficient}  (e.g., {0: 981/100, 2: 1})
+    """
+    expr = sage_eval(str(expr), locals=var_dict)
+    if type(expr) is not sage.symbolic.expression.Expression:
+        return {0: expr}
+    terms = expr.coefficients(diff_var)
+    result = {}
+
+    for term in terms:
+        # each term is a tuple [coefficient, degree]
+        coeff = term[0]
+        degree = term[1]
+        result[degree] = coeff
+
+    return result
 
 
-#def check_ode_satisfaction_error()
+# Verify that the given data satisfies the given differential equation
+def calculate_differential_equation_error_numeric(differential_eq, sage_locals, data_generating_functions, data, **kwargs):
+    dx = kwargs.get("diff_var", var("x"))
+    locals_values = kwargs.get("locals_values", {sage_locals[var_name] : 1.0 for var_name in sage_locals})
+    # We know we that the channel count is equal to the number of tasks
+    channel_values = [[] for _ in range(len(differential_eq))]
+    differential_equation_error = None 
+    functions = data_generating_functions
+    for i, column in enumerate(differential_eq):
+        # Each channel contains the polynom of differentials that is used on the respective channel
+        # Dictionary of the form {order: coeff}
+        coeff_dict = extract_differential_polynomial_terms(column, dx, sage_locals)
+        for order, coeff in coeff_dict.items():
+            try:
+                coeff = coeff.subs(locals_values)
+                diff_approx = central_difference(functions, data, order=order)[:, i]
+                if differential_equation_error is None:
+                    differential_equation_error = float(coeff)*diff_approx
+                else:
+                    differential_equation_error += float(coeff)*diff_approx
+            except Exception as e:
+                print(coeff)
+                print(e)
+    return differential_equation_error
+
+# Verify that the functions satisfy the given differential equation
+def calculate_differential_equation_error_symbolic(functions, differential_eq, sage_locals, **kwargs):
+    # We know we that the channel count is equal to the number of tasks
+    dx = kwargs.get("diff_var", var("x"))
+    differential_equation_error = 0
+    for i, column in enumerate(differential_eq):
+        # Each channel contains the polynom of differentials that is used on the respective channel
+        # Dictionary of the form {order: coeff}
+        coeff_dict = extract_differential_polynomial_terms(column, dx, sage_locals)
+        for order, coeff in coeff_dict.items():
+            differential_equation_error += coeff*functions[i].diff(dx, int(order))
+    return differential_equation_error
