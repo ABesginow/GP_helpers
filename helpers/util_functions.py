@@ -288,7 +288,9 @@ def log_normalized_prior(model, param_specs, kernel_param_specs, theta_mu=None, 
 
 
 def central_difference(f, x, h=1e-2, order=1, precision = 6):
-    if order == 1:
+    if order == 0:
+        return f(x)
+    elif order == 1:
         if precision == 2:
             return (f(x + h) - f(x - h)) / (h)
         elif precision == 6:
