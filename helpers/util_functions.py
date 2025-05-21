@@ -306,7 +306,7 @@ def central_difference(f, x, h=1e-2, order=1, precision = 6):
 
 def extract_differential_polynomial_terms(expr, diff_var, var_dict):
     # Only if I calculate the ODE satisfaction errors require the sagemath library
-    from sage.all import *
+    from sage.all import sage_eval
     import sage
     #https://ask.sagemath.org/question/41204/getting-my-own-module-to-work-in-sage/
     from sage.calculus.var import var
@@ -338,6 +338,10 @@ def extract_differential_polynomial_terms(expr, diff_var, var_dict):
 
 # Verify that the given data satisfies the given differential equation
 def calculate_differential_equation_error_numeric(differential_eq, sage_locals, data_generating_functions, data, **kwargs):
+    from sage.all import sage_eval
+    import sage
+    #https://ask.sagemath.org/question/41204/getting-my-own-module-to-work-in-sage/
+    from sage.calculus.var import var
     dx = kwargs.get("diff_var", var("x"))
     locals_values = kwargs.get("locals_values", {sage_locals[var_name] : 1.0 for var_name in sage_locals})
     # We know we that the channel count is equal to the number of tasks
@@ -363,6 +367,10 @@ def calculate_differential_equation_error_numeric(differential_eq, sage_locals, 
 
 # Verify that the functions satisfy the given differential equation
 def calculate_differential_equation_error_symbolic(functions, differential_eq, sage_locals, **kwargs):
+    from sage.all import sage_eval
+    import sage
+    #https://ask.sagemath.org/question/41204/getting-my-own-module-to-work-in-sage/
+    from sage.calculus.var import var
     # We know we that the channel count is equal to the number of tasks
     dx = kwargs.get("diff_var", var("x"))
     differential_equation_error = 0
