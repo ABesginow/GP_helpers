@@ -247,6 +247,7 @@ def granso_optimization(model, likelihood, train_x, train_y, **kwargs):
             return [halt_log_fn, get_log_fn]
 
     random_restarts = kwargs.get("random_restarts", 5)
+    maxit = kwargs.get("maxit", 1000)
     uninformed = kwargs.get("uninformed", False)
     logarithmic_reinit = kwargs.get("logarithmic_reinit", False)
 
@@ -277,6 +278,7 @@ def granso_optimization(model, likelihood, train_x, train_y, **kwargs):
     opts.quadprog_info_msg = False
     opts.print_level = int(0)
     opts.halt_on_linesearch_bracket = False
+    opts.maxit = maxit
     mHLF_obj = HaltLog()
     [halt_log_fn, get_log_fn] = mHLF_obj.makeHaltLogFunctions(restarts=random_restarts)
 
