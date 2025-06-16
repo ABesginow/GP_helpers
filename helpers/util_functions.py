@@ -286,6 +286,16 @@ def log_normalized_prior(model, param_specs, kernel_param_specs, theta_mu=None, 
     log_prob = prior.log_prob(params) / len(*model.train_inputs)
     return log_prob.squeeze(0)
 
+# Find all points inside the confidence ellipse
+def percentage_inside_ellipse(mu, K, points, sigma_level=2):
+    L = np.linalg.cholesky(K)
+    threshold = sigma_level ** 2
+    count = 0
+    for point in points:
+        res = np.array(point - mu) @ np.linalg.inv(L)
+        if res @ res <= threshold:
+            count += 1
+    return count / len(points)
 
 def central_difference(f, x, h=1e-2, order=1, precision = 6):
     if order == 0:
