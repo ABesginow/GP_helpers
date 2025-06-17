@@ -211,3 +211,69 @@ def plot_single_input_gp_posterior(
 
     if return_fig:
         return fig, ax
+
+
+# =============================================
+# 3D plotting
+# =============================================
+
+def plot_3d_data(samples, xx, yy, return_figure=False, fig=None, ax=None, display_figure=True, title_add = "", shadow=True):
+    """
+    Similar to plot_3d_gp_samples, but color-codes each (xx, yy) point in 3D.
+    'samples' can be a single 1D tensor or multiple samples in a 2D tensor.
+    """
+    if not (fig and ax):
+        fig = plt.figure(figsize=(8, 6))
+        ax = fig.add_subplot(111, projection='3d')
+
+    #if samples.ndim == 1:
+    #    samples = samples.unsqueeze(0)
+
+    #z_vals = samples.reshape(xx.shape)
+    z_vals = samples
+    ax.scatter(xx.numpy(), yy.numpy(), z_vals.numpy(),
+                c=z_vals.numpy(), cmap='viridis', alpha=0.8)
+
+
+    if shadow:
+        # Plot shadows (projection on X-Y plane at z=0)
+        ax.scatter(xx.numpy(), yy.numpy(), 
+                np.ones_like(z_vals)*np.min(z_vals.numpy().flatten()), 
+                c='gray', alpha=0.3, marker='o')
+
+
+
+    ax.set_title(f'Data {title_add}')
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Output Value')
+    if not return_figure and display_figure:
+        plt.show()
+    else:
+        return fig, ax
+
+def plot_3d_gp_samples(samples, xx, yy, return_figure=False, fig=None, ax=None, display_figure=True):
+    """
+    Visualize multiple samples drawn from a 2D-input (xx, yy) -> 1D-output GP in 3D.
+    Each sample in 'samples' should be a 1D tensor that can be reshaped to match xx, yy.
+    """
+    if not (fig and ax):
+        fig = plt.figure(figsize=(8, 6))
+        ax = fig.add_subplot(111, projection='3d')
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    if samples.ndim == 1:
+        samples = samples.unsqueeze(0)
+    for i, sample in enumerate(samples):
+        z_vals = sample.reshape(xx.shape)
+        ax.plot_surface(xx.numpy(), yy.numpy(), z_vals.numpy(), alpha=0.4)
+
+    ax.set_title('GP Samples in 3D')
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Output')
+    if not return_figure and display_figure:
+        plt.show()
+    else:
+        return fig, ax
+
