@@ -188,7 +188,6 @@ def _lin_lin_times(*, active_dims=None, **_):
     k1 = _lin(active_dims=active_dims[1])
     return k0 * k1
 
-
 @register("[LIN; SE]")
 def _lin_se(*, active_dims=None, **_):
     # active_dims is a 2-tuple like ([0], [1]) you pass in the model

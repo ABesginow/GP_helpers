@@ -3,10 +3,9 @@ import torch
 from helpers.example_kernels import build
 
 
-
-
-def _BaseExactGP(gpytorch.models.ExactGP):
-    def __init__(self, train_x, train_y, likelihood, kernel_name="SE", weights=None, active_dims=None):
+class _BaseExactGP(gpytorch.models.ExactGP):
+    def __init__(self, train_x, train_y, likelihood, kernel_name="SE",
+                 weights=None, active_dims=None):
         super(_BaseExactGP, self).__init__(train_x, train_y, likelihood)
         self.mean_module = gpytorch.means.ZeroMean()
         self.covar_module = build(kernel_name,
@@ -19,7 +18,7 @@ def _BaseExactGP(gpytorch.models.ExactGP):
         return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
     
 
-def _BaseDataExactGP(_BaseExactGP):
+class _BaseDataGP(_BaseExactGP):
 
     def sample(self, x, n_samples=1, from_likelihood=False, prior_mode=False):
         with torch.no_grad(), gpytorch.settings.prior_mode(prior_mode):
@@ -35,17 +34,8 @@ def _BaseDataExactGP(_BaseExactGP):
             return draw.detach()
         
 
-def ExactGPModel(_BaseExactGP):
+class ExactGPModel(_BaseExactGP):
     pass
 
-def DataExactGPModel(_BaseDataExactGP):
+class DataGPModel(_BaseDataGP):
     pass
-
-def ExactMIGPModel(_BaseExactGP):
-    pass
-
-def DataMIGPModel(_BaseDataExactGP):
-    pass
-
-
-
