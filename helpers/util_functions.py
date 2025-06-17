@@ -95,6 +95,12 @@ def match_lode_parameter_spec(param_name, kernel_param_specs, default_bounds, de
     return default_bounds, default_type
 
 
+def reparameterize_model(model, theta):
+    for model_param, sampled_param in zip(model.parameters(), theta):
+        model_param.data = torch.full_like(model_param.data, float(sampled_param))
+
+
+
 def randomize_model_hyperparameters(
     model,
     param_specs=None,
