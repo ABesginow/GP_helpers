@@ -1,14 +1,8 @@
-from helpFunctions import get_string_representation_of_kernel as gsr
-from helpFunctions import get_full_kernels_in_kernel_expression
-from globalParams import options
 import gpytorch
-import itertools
-import numpy as np
 import pandas as pd
 import torch
 from typing import List, Union, Callable
-import types
-import gp_classes
+import helpers.gp_classes
 
 # Registry for input patterns
 INPUT_PATTERNS = {}
