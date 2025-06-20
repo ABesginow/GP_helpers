@@ -361,11 +361,14 @@ def prior_distribution(
     kernel_index = 0
 
     for name, _ in model.named_hyperparameters():
-
-        if name in param_specs:
-            kernel_type = "<explicit>"
-        elif "LODE_Kernel" in kernel_types:
-            kernel_type = "LODE_Kernel"
+        if not param_specs is None:
+            if name in param_specs:
+                kernel_type = "<explicit>"
+            elif "LODE_Kernel" in kernel_types:
+                kernel_type = "LODE_Kernel"
+            else:
+                kernel_type = kernel_types[kernel_index] if kernel_index < len(kernel_types) else "<unknown>"
+                kernel_index += 1
         else:
             kernel_type = kernel_types[kernel_index] if kernel_index < len(kernel_types) else "<unknown>"
             kernel_index += 1
@@ -391,14 +394,28 @@ def prior_distribution(
     return mean_values, std_values
 
 
-def log_normalized_prior(model, param_specs, kernel_param_specs, theta_mu=None, sigma=None):
-    theta_mu, sigma = prior_distribution(model, param_specs=param_specs, kernel_param_specs=kernel_param_specs) if theta_mu is None or sigma is None else (theta_mu, sigma)
+def extract_model_parameters(model):
+    params = None
+    for (_, param) in model.named_parameters():
+        if params == None:
+            params = param
+        else:
+            if len(param.shape)==0:
+                params = torch.cat((params, param.unsqueeze(0)))
+            elif len(param.shape)==1:
+                params = torch.cat((params, param))
+            else:
+                params = torch.cat((params, param.squeeze(0)))
+    return params
+
+def log_normalized_prior(model, param_specs, kernel_param_specs, theta_mu=None, variance=None):
+    theta_mu, variance = prior_distribution(model, param_specs=param_specs, kernel_param_specs=kernel_param_specs) if theta_mu is None or variance is None else (theta_mu, variance)
     if not type(theta_mu) == torch.Tensor:
         theta_mu = torch.tensor(theta_mu)
-    if not type(sigma) == torch.Tensor:
-        sigma = torch.tensor(sigma)
-        sigma = torch.diag(sigma)
-    prior = torch.distributions.MultivariateNormal(theta_mu.t(), sigma)
+    if not type(variance) == torch.Tensor:
+        variance = torch.tensor(variance)
+        variance = torch.diag(variance)
+    prior = torch.distributions.MultivariateNormal(theta_mu.t(), variance)
 
     params = None
     for (_, param) in model.named_parameters():
