@@ -217,7 +217,7 @@ def plot_single_input_gp_posterior(
 # 3D plotting
 # =============================================
 
-def plot_3d_data(samples, xx, yy, return_figure=False, fig=None, ax=None, display_figure=True, title_add = "", shadow=True):
+def plot_3d_data(xx, yy, samples, return_figure=False, fig=None, ax=None, display_figure=True, titles=None, shadow=True):
     """
     Similar to plot_3d_gp_samples, but color-codes each (xx, yy) point in 3D.
     'samples' can be a single 1D tensor or multiple samples in a 2D tensor.
@@ -243,7 +243,7 @@ def plot_3d_data(samples, xx, yy, return_figure=False, fig=None, ax=None, displa
 
 
 
-    ax.set_title(f'Data {title_add}')
+    ax.set_title(f'{titles}')
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Output Value')
@@ -252,7 +252,7 @@ def plot_3d_data(samples, xx, yy, return_figure=False, fig=None, ax=None, displa
     else:
         return fig, ax
 
-def plot_3d_gp_samples(samples, xx, yy, return_figure=False, fig=None, ax=None, display_figure=True):
+def plot_3d_gp_samples(xx, yy, samples, return_figure=False, fig=None, ax=None, display_figure=True, titles=None):
     """
     Visualize multiple samples drawn from a 2D-input (xx, yy) -> 1D-output GP in 3D.
     Each sample in 'samples' should be a 1D tensor that can be reshaped to match xx, yy.
@@ -260,15 +260,13 @@ def plot_3d_gp_samples(samples, xx, yy, return_figure=False, fig=None, ax=None, 
     if not (fig and ax):
         fig = plt.figure(figsize=(8, 6))
         ax = fig.add_subplot(111, projection='3d')
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
     if samples.ndim == 1:
         samples = samples.unsqueeze(0)
     for i, sample in enumerate(samples):
         z_vals = sample.reshape(xx.shape)
         ax.plot_surface(xx.numpy(), yy.numpy(), z_vals.numpy(), alpha=0.4)
 
-    ax.set_title('GP Samples in 3D')
+    ax.set_title(f'{titles}')
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Output')
