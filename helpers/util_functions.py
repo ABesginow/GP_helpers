@@ -107,103 +107,103 @@ def fixed_reinit(model, parameters: torch.tensor) -> None:
 
 
 
-def prior_distribution(model, uninformed=False):
-    uninformed_prior_dict = {'SE': {'raw_lengthscale' : {"mean": 0. , "std":10.}},
-                  'MAT52': {'raw_lengthscale' :{"mean": 0., "std":10. } },
-                  'MAT32': {'raw_lengthscale' :{"mean": 0., "std":10. } },
-                  'RQ': {'raw_lengthscale' :{"mean": 0., "std":10. },
-                          'raw_alpha' :{"mean": 0., "std":10. } },
-                  'PER':{'raw_lengthscale':{"mean": 0., "std":10. },
-                          'raw_period_length':{"mean": 0., "std":10. } },
-                  'LIN':{'raw_variance' :{"mean": 0., "std":10. } },
-                  'AFF':{'raw_variance' :{"mean": 0., "std":10. } },
-                  'c':{'raw_outputscale':{"mean": 0., "std":10. } },
-                  'noise': {'raw_noise':{"mean": 0., "std":10. }}}
-
-    # TODO de-spaghettize this once the priors are coded properly
-    prior_dict = {'SE': {'raw_lengthscale' : {"mean": -0.21221139138922668 , "std":1.8895426067756804}},
-                  'MAT52': {'raw_lengthscale' :{"mean": 0.7993038925994188, "std":2.145122566357853 } },
-                  'MAT32': {'raw_lengthscale' :{"mean": 1.5711054238673443, "std":2.4453761235991216 } },
-                  'RQ': {'raw_lengthscale' :{"mean": -0.049841950913676276, "std":1.9426354614713097 },
-                          'raw_alpha' :{"mean": 1.882148553921053, "std":3.096431944989054 } },
-                  'PER':{'raw_lengthscale':{"mean": 0.7778461197268618, "std":2.288946656544974 },
-                          'raw_period_length':{"mean": 0.6485334993738499, "std":0.9930632050553377 } },
-                  'LIN':{'raw_variance' :{"mean": -0.8017903983055685, "std":0.9966569921354465 } },
-                  'AFF':{'raw_variance' :{"mean": -0.8017903983055685, "std":0.9966569921354465 } },
-                  'c':{'raw_outputscale':{"mean": -1.6253091096349706, "std":2.2570021716661923 } },
-                  'noise': {'raw_noise':{"mean": -3.51640656386717, "std":3.5831320474767407 }}}
-    #prior_dict = {"SE": {"raw_lengthscale": {"mean": 0.891, "std": 2.195}},
-    #              "MAT": {"raw_lengthscale": {"mean": 1.631, "std": 2.554}},
-    #              "PER": {"raw_lengthscale": {"mean": 0.338, "std": 2.636},
-    #                      "raw_period_length": {"mean": 0.284, "std": 0.902}},
-    #              "LIN": {"raw_variance": {"mean": -1.463, "std": 1.633}},
-    #              "c": {"raw_outputscale": {"mean": -2.163, "std": 2.448}},
-    #              "noise": {"raw_noise": {"mean": -1.792, "std": 3.266}}}
-
-    if uninformed:
-        prior_dict = uninformed_prior_dict
-
-
-    variances_list = list()
-    debug_param_name_list = list()
-    theta_mu = list()
-    params = None 
-    covar_string = gsr(model.covar_module)
-    covar_string = covar_string.replace("(", "")
-    covar_string = covar_string.replace(")", "")
-    covar_string = covar_string.replace(" ", "")
-    covar_string = covar_string.replace("PER", "PER+PER")
-    covar_string = covar_string.replace("RQ", "RQ+RQ")
-    covar_string_list = [s.split("*") for s in covar_string.split("+")]
-    covar_string_list.insert(0, ["LIKELIHOOD"])
-    covar_string_list = list(itertools.chain.from_iterable(covar_string_list))
-    both_PER_params = False
-    for (param_name, param), cov_str in zip(model.named_parameters(), covar_string_list):
-        if params == None:
-            params = param
-        else:
-            if len(param.shape)==0:
-                params = torch.cat((params,param.unsqueeze(0)))
-            elif len(param.shape)==1:
-                params = torch.cat((params,param))
-            else:
-                params = torch.cat((params,param.squeeze(0)))
-        debug_param_name_list.append(param_name)
-        curr_mu = None
-        curr_var = None
-        # First param is (always?) noise and is always with the likelihood
-        if "likelihood" in param_name:
-            curr_mu = prior_dict["noise"]["raw_noise"]["mean"]
-            curr_var = prior_dict["noise"]["raw_noise"]["std"]
-        else:
-            if (cov_str == "PER" or cov_str == "RQ") and not both_PER_params:
-                curr_mu = prior_dict[cov_str][param_name.split(".")[-1]]["mean"]
-                curr_var = prior_dict[cov_str][param_name.split(".")[-1]]["std"]
-                both_PER_params = True
-            elif (cov_str == "PER" or cov_str == "RQ") and both_PER_params:
-                curr_mu = prior_dict[cov_str][param_name.split(".")[-1]]["mean"]
-                curr_var = prior_dict[cov_str][param_name.split(".")[-1]]["std"]
-                both_PER_params = False
-            else:
-                try:
-                    curr_mu = prior_dict[cov_str][param_name.split(".")[-1]]["mean"]
-                    curr_var = prior_dict[cov_str][param_name.split(".")[-1]]["std"]
-                except Exception as E:
-                    import pdb
-                    #pdb.set_trace()
-                    prev_cov = cov_str
-        theta_mu.append(curr_mu)
-        variances_list.append(curr_var)
-    theta_mu = torch.tensor(theta_mu)
-    theta_mu = theta_mu.unsqueeze(0).t()
-    sigma = torch.diag(torch.Tensor(variances_list))
-    variance = sigma@sigma
-    return theta_mu, variance
+#def prior_distribution(model, uninformed=False):
+#    uninformed_prior_dict = {'SE': {'raw_lengthscale' : {"mean": 0. , "std":10.}},
+#                  'MAT52': {'raw_lengthscale' :{"mean": 0., "std":10. } },
+#                  'MAT32': {'raw_lengthscale' :{"mean": 0., "std":10. } },
+#                  'RQ': {'raw_lengthscale' :{"mean": 0., "std":10. },
+#                          'raw_alpha' :{"mean": 0., "std":10. } },
+#                  'PER':{'raw_lengthscale':{"mean": 0., "std":10. },
+#                          'raw_period_length':{"mean": 0., "std":10. } },
+#                  'LIN':{'raw_variance' :{"mean": 0., "std":10. } },
+#                  'AFF':{'raw_variance' :{"mean": 0., "std":10. } },
+#                  'c':{'raw_outputscale':{"mean": 0., "std":10. } },
+#                  'noise': {'raw_noise':{"mean": 0., "std":10. }}}
+#
+#    # TODO de-spaghettize this once the priors are coded properly
+#    prior_dict = {'SE': {'raw_lengthscale' : {"mean": -0.21221139138922668 , "std":1.8895426067756804}},
+#                  'MAT52': {'raw_lengthscale' :{"mean": 0.7993038925994188, "std":2.145122566357853 } },
+#                  'MAT32': {'raw_lengthscale' :{"mean": 1.5711054238673443, "std":2.4453761235991216 } },
+#                  'RQ': {'raw_lengthscale' :{"mean": -0.049841950913676276, "std":1.9426354614713097 },
+#                          'raw_alpha' :{"mean": 1.882148553921053, "std":3.096431944989054 } },
+#                  'PER':{'raw_lengthscale':{"mean": 0.7778461197268618, "std":2.288946656544974 },
+#                          'raw_period_length':{"mean": 0.6485334993738499, "std":0.9930632050553377 } },
+#                  'LIN':{'raw_variance' :{"mean": -0.8017903983055685, "std":0.9966569921354465 } },
+#                  'AFF':{'raw_variance' :{"mean": -0.8017903983055685, "std":0.9966569921354465 } },
+#                  'c':{'raw_outputscale':{"mean": -1.6253091096349706, "std":2.2570021716661923 } },
+#                  'noise': {'raw_noise':{"mean": -3.51640656386717, "std":3.5831320474767407 }}}
+#    #prior_dict = {"SE": {"raw_lengthscale": {"mean": 0.891, "std": 2.195}},
+#    #              "MAT": {"raw_lengthscale": {"mean": 1.631, "std": 2.554}},
+#    #              "PER": {"raw_lengthscale": {"mean": 0.338, "std": 2.636},
+#    #                      "raw_period_length": {"mean": 0.284, "std": 0.902}},
+#    #              "LIN": {"raw_variance": {"mean": -1.463, "std": 1.633}},
+#    #              "c": {"raw_outputscale": {"mean": -2.163, "std": 2.448}},
+#    #              "noise": {"raw_noise": {"mean": -1.792, "std": 3.266}}}
+#
+#    if uninformed:
+#        prior_dict = uninformed_prior_dict
+#
+#
+#    variances_list = list()
+#    debug_param_name_list = list()
+#    theta_mu = list()
+#    params = None 
+#    covar_string = gsr(model.covar_module)
+#    covar_string = covar_string.replace("(", "")
+#    covar_string = covar_string.replace(")", "")
+#    covar_string = covar_string.replace(" ", "")
+#    covar_string = covar_string.replace("PER", "PER+PER")
+#    covar_string = covar_string.replace("RQ", "RQ+RQ")
+#    covar_string_list = [s.split("*") for s in covar_string.split("+")]
+#    covar_string_list.insert(0, ["LIKELIHOOD"])
+#    covar_string_list = list(itertools.chain.from_iterable(covar_string_list))
+#    both_PER_params = False
+#    for (param_name, param), cov_str in zip(model.named_parameters(), covar_string_list):
+#        if params == None:
+#            params = param
+#        else:
+#            if len(param.shape)==0:
+#                params = torch.cat((params,param.unsqueeze(0)))
+#            elif len(param.shape)==1:
+#                params = torch.cat((params,param))
+#            else:
+#                params = torch.cat((params,param.squeeze(0)))
+#        debug_param_name_list.append(param_name)
+#        curr_mu = None
+#        curr_var = None
+#        # First param is (always?) noise and is always with the likelihood
+#        if "likelihood" in param_name:
+#            curr_mu = prior_dict["noise"]["raw_noise"]["mean"]
+#            curr_var = prior_dict["noise"]["raw_noise"]["std"]
+#        else:
+#            if (cov_str == "PER" or cov_str == "RQ") and not both_PER_params:
+#                curr_mu = prior_dict[cov_str][param_name.split(".")[-1]]["mean"]
+#                curr_var = prior_dict[cov_str][param_name.split(".")[-1]]["std"]
+#                both_PER_params = True
+#            elif (cov_str == "PER" or cov_str == "RQ") and both_PER_params:
+#                curr_mu = prior_dict[cov_str][param_name.split(".")[-1]]["mean"]
+#                curr_var = prior_dict[cov_str][param_name.split(".")[-1]]["std"]
+#                both_PER_params = False
+#            else:
+#                try:
+#                    curr_mu = prior_dict[cov_str][param_name.split(".")[-1]]["mean"]
+#                    curr_var = prior_dict[cov_str][param_name.split(".")[-1]]["std"]
+#                except Exception as E:
+#                    import pdb
+#                    #pdb.set_trace()
+#                    prev_cov = cov_str
+#        theta_mu.append(curr_mu)
+#        variances_list.append(curr_var)
+#    theta_mu = torch.tensor(theta_mu)
+#    theta_mu = theta_mu.unsqueeze(0).t()
+#    sigma = torch.diag(torch.Tensor(variances_list))
+#    variance = sigma@sigma
+#    return theta_mu, variance
  
 
-def log_normalized_prior(model, theta_mu=None, sigma=None, uninformed=False):
-    theta_mu, sigma = prior_distribution(model, uninformed=uninformed) if theta_mu is None or sigma is None else (theta_mu, sigma)
-    prior = torch.distributions.MultivariateNormal(theta_mu.t(), sigma)
+def log_normalized_prior(model, theta_mu=None, variance=None, uninformed=False):
+    theta_mu, variance = prior_distribution(model, uninformed=uninformed) if theta_mu is None or variance is None else (theta_mu, variance)
+    prior = torch.distributions.MultivariateNormal(theta_mu.t(), variance)
 
     params = None
     for (param_name, param) in model.named_parameters():
@@ -348,7 +348,7 @@ def prior_distribution(
     kernel_param_specs=None,
     default_mean=0.0,
     default_std=10.0
-):
+) -> tuple[torch.Tensor, torch.Tensor]:
     """
     Collects prior parameters (mean, variance) for all named hyperparameters in the model.
 
@@ -356,7 +356,7 @@ def prior_distribution(
     - List of tuples: (param_name, tensor, mean, variance)
     """
     mean_values = []
-    std_values = []
+    var_values = []
     kernel_types = get_full_kernels_in_kernel_expression(model.covar_module)
     kernel_index = 0
 
@@ -385,13 +385,13 @@ def prior_distribution(
         # MultitaskGPs have an independent noise for each task
         if name == "likelihood.raw_task_noises":
             mean_values.extend([spec["mean"] for _ in range(model.num_tasks)])
-            std_values.extend([spec["std"] for _ in range(model.num_tasks)])
+            var_values.extend([spec["std"]**2 for _ in range(model.num_tasks)])
         # These are also ARD Kernels, which I usually don't care about, that have the same issue
         else:
             mean_values.append(spec["mean"])
-            std_values.append(spec["std"])
+            var_values.append(spec["std"]**2)
 
-    return mean_values, std_values
+    return torch.tensor(mean_values), torch.diag(torch.tensor(var_values))
 
 
 def extract_model_parameters(model):
@@ -412,9 +412,12 @@ def log_normalized_prior(model, param_specs, kernel_param_specs, theta_mu=None, 
     theta_mu, variance = prior_distribution(model, param_specs=param_specs, kernel_param_specs=kernel_param_specs) if theta_mu is None or variance is None else (theta_mu, variance)
     if not type(theta_mu) == torch.Tensor:
         theta_mu = torch.tensor(theta_mu)
-    if not type(variance) == torch.Tensor:
+    if not type(variance) == torch.Tensor: 
         variance = torch.tensor(variance)
         variance = torch.diag(variance)
+    elif not (variance.ndim == 2 and variance.size(0) == variance.size(1)):
+        variance = torch.diag(variance)
+
     prior = torch.distributions.MultivariateNormal(theta_mu.t(), variance)
 
     params = None
