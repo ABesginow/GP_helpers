@@ -95,7 +95,7 @@ def plot_training_data(
         plt.show()
 
     if return_fig:
-        return fig
+        return fig, ax
 
 
 # Usage examples:
