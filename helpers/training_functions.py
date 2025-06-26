@@ -72,6 +72,7 @@ def adam_optimization(model, likelihood, train_x, train_y, **kwargs):
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     uninformed = kwargs.get("uninformed", False)
     logarithmic_reinit = kwargs.get("logarithmic_reinit", False)
+    model_parameter_prior = kwargs.get("model_parameter_prior", None)
 
 
     all_state_dicts_likelihoods_losses = []
@@ -86,7 +87,7 @@ def adam_optimization(model, likelihood, train_x, train_y, **kwargs):
 
             if MAP:
                 # log_normalized_prior is in metrics.py 
-                log_p = log_normalized_prior(model, param_specs=parameter_priors, kernel_param_specs=kernel_parameter_priors)
+                log_p = log_normalized_prior(model, param_specs=parameter_priors, kernel_param_specs=kernel_parameter_priors, prior=model_parameter_prior)
                 # negative scaled MAP
                 loss -= log_p
             loss.backward()
@@ -104,7 +105,7 @@ def adam_optimization(model, likelihood, train_x, train_y, **kwargs):
         try:
             loss = -mll_fkt(model(train_x), train_y)
             if MAP:
-                log_p = log_normalized_prior(model, param_specs=parameter_priors, kernel_param_specs=kernel_parameter_priors)
+                log_p = log_normalized_prior(model, param_specs=parameter_priors, kernel_param_specs=kernel_parameter_priors, prior=model_parameter_prior)
                 loss -= log_p
             if verbose:
                 print(f"----")
@@ -248,8 +249,8 @@ def granso_optimization(model, likelihood, train_x, train_y, **kwargs):
 
     random_restarts = kwargs.get("random_restarts", 5)
     maxit = kwargs.get("maxit", 1000)
-    uninformed = kwargs.get("uninformed", False)
-    logarithmic_reinit = kwargs.get("logarithmic_reinit", False)
+    model_parameter_prior = kwargs.get("model_parameter_prior", None)
+
 
     """
     # The call that comes from GRANSO
@@ -298,7 +299,7 @@ def granso_optimization(model, likelihood, train_x, train_y, **kwargs):
             loss = torch.tensor(np.finfo(np.float32).max, requires_grad=True) + torch.tensor(-10.0)
         if MAP:
             # log_normalized_prior is in metrics.py 
-            log_p = log_normalized_prior(model, param_specs=parameter_priors, kernel_param_specs=kernel_parameter_priors)
+            log_p = log_normalized_prior(model, param_specs=parameter_priors, kernel_param_specs=kernel_parameter_priors, prior=model_parameter_prior)
             # negative scaled MAP
             loss -= log_p
         #print(f"LOG: {loss}")
@@ -331,7 +332,7 @@ def granso_optimization(model, likelihood, train_x, train_y, **kwargs):
         try:
             loss = -mll_fkt(model(train_x), train_y)
             if MAP:
-                log_p = log_normalized_prior(model, param_specs=parameter_priors, kernel_param_specs=kernel_parameter_priors)
+                log_p = log_normalized_prior(model, param_specs=parameter_priors, kernel_param_specs=kernel_parameter_priors, prior=model_parameter_prior)
                 loss -= log_p
             if verbose:
                 print(f"----")
