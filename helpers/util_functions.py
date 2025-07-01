@@ -201,25 +201,25 @@ def fixed_reinit(model, parameters: torch.tensor) -> None:
 #    return theta_mu, variance
  
 
-def log_normalized_prior(model, theta_mu=None, variance=None, uninformed=False):
-    theta_mu, variance = prior_distribution(model, uninformed=uninformed) if theta_mu is None or variance is None else (theta_mu, variance)
-    prior = torch.distributions.MultivariateNormal(theta_mu.t(), variance)
-
-    params = None
-    for (param_name, param) in model.named_parameters():
-        if params == None:
-            params = param
-        else:
-            if len(param.shape)==0:
-                params = torch.cat((params,param.unsqueeze(0)))
-            elif len(param.shape)==1:
-                params = torch.cat((params,param))
-            else:
-                params = torch.cat((params,param.squeeze(0)))
- 
-    # for convention reasons I'm diving by the number of datapoints
-    log_prob = prior.log_prob(params) / len(*model.train_inputs)
-    return log_prob.squeeze(0)
+#def log_normalized_prior(model, theta_mu=None, variance=None, uninformed=False):
+#    theta_mu, variance = prior_distribution(model, uninformed=uninformed) if theta_mu is None or variance is None else (theta_mu, variance)
+#    prior = torch.distributions.MultivariateNormal(theta_mu.t(), variance)
+#
+#    params = None
+#    for (param_name, param) in model.named_parameters():
+#        if params == None:
+#            params = param
+#        else:
+#            if len(param.shape)==0:
+#                params = torch.cat((params,param.unsqueeze(0)))
+#            elif len(param.shape)==1:
+#                params = torch.cat((params,param))
+#            else:
+#                params = torch.cat((params,param.squeeze(0)))
+# 
+#    # for convention reasons I'm diving by the number of datapoints
+#    log_prob = prior.log_prob(params) / len(*model.train_inputs)
+#    return log_prob.squeeze(0)
 
 
 
@@ -421,18 +421,8 @@ def log_normalized_prior(model, param_specs, kernel_param_specs, theta_mu=None, 
 
         prior = torch.distributions.MultivariateNormal(theta_mu.t(), variance)
 
-    params = None
-    for (_, param) in model.named_parameters():
-        if params == None:
-            params = param
-        else:
-            if len(param.shape)==0:
-                params = torch.cat((params, param.unsqueeze(0)))
-            elif len(param.shape)==1:
-                params = torch.cat((params, param))
-            else:
-                params = torch.cat((params, param.squeeze(0)))
- 
+    params = extract_model_parameters(model)
+
     # for convention reasons I'm dividing by the number of datapoints
     log_prob = prior.log_prob(params) / len(*model.train_inputs)
     return log_prob.squeeze(0)
