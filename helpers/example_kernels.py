@@ -82,6 +82,15 @@ def _c_c_se(*, active_dims=None, **_):
     return gpytorch.kernels.ScaleKernel(
         gpytorch.kernels.ScaleKernel(_se(active_dims=active_dims)))
 
+@register("C*MAT32")
+def _mat32(*, active_dims=None, **_):
+    return gpytorch.kernels.ScaleKernel(
+        gpytorch.kernels.MaternKernel(nu=1.5, active_dims=active_dims))
+
+@register("C*MAT52")
+def _mat52(*, active_dims=None, **_):
+    return gpytorch.kernels.ScaleKernel(
+        gpytorch.kernels.MaternKernel(nu=2.5, active_dims=active_dims))
 ####### Combinations of base kernels (size 2)
 
 @register("LIN*PER")
