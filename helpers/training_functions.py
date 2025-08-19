@@ -250,6 +250,8 @@ def granso_optimization(model, likelihood, train_x, train_y, **kwargs):
     random_restarts = kwargs.get("random_restarts", 5)
     maxit = kwargs.get("maxit", 1000)
     model_parameter_prior = kwargs.get("model_parameter_prior", None)
+    var_in = kwargs.get("var_in", None)
+    objective_function = kwargs.get("objective_function", None)
 
 
     """
@@ -286,24 +288,26 @@ def granso_optimization(model, likelihood, train_x, train_y, **kwargs):
     #  Set PyGRANSO's logging function in opts
     opts.halt_log_fn = halt_log_fn
 
-    # Define the objective function
-    def objective_function(model):
-        output = model(train_x)
-        try:
-            # TODO PyGRANSO dying is a severe problem. as it literally exits the program instead of raising an error
-            # negative scaled MLL
-            loss = -mll_fkt(output, train_y)
-        except Exception as E:
-            print("LOG ERROR: Severe PyGRANSO issue. Loss is inf+0")
-            print(f"LOG ERROR: {E}")
-            loss = torch.tensor(np.finfo(np.float32).max, requires_grad=True) + torch.tensor(-10.0)
-        if MAP:
-            # log_normalized_prior is in metrics.py 
-            log_p = log_normalized_prior(model, param_specs=parameter_priors, kernel_param_specs=kernel_parameter_priors, prior=model_parameter_prior)
-            # negative scaled MAP
-            loss -= log_p
-        #print(f"LOG: {loss}")
-        return [loss, None, None]
+    if not objective_function:
+        # Define the objective function
+        def objective_function(model):
+            output = model(train_x)
+            try:
+                # TODO PyGRANSO dying is a severe problem. as it literally exits the program instead of raising an error
+                # negative scaled MLL
+                loss = -mll_fkt(output, train_y)
+            except Exception as E:
+                print("LOG ERROR: Severe PyGRANSO issue. Loss is inf+0")
+                print(f"LOG ERROR: {E}")
+                loss = torch.tensor(np.finfo(np.float32).max, requires_grad=True) + torch.tensor(-10.0)
+            if MAP:
+                # log_normalized_prior is in metrics.py 
+                log_p = log_normalized_prior(model, param_specs=parameter_priors, kernel_param_specs=kernel_parameter_priors, prior=model_parameter_prior)
+                # negative scaled MAP
+                loss -= log_p
+            #print(f"LOG: {loss}")
+            return [loss, None, None]
+    
 
     all_state_dicts_likelihoods_losses = []
 
