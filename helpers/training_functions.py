@@ -334,15 +334,18 @@ def granso_optimization(model, likelihood, train_x, train_y, **kwargs):
         model.load_state_dict(state_dict)
         likelihood.load_state_dict(likelihood_state_dict)
         try:
-            loss = -mll_fkt(model(train_x), train_y)
-            if MAP:
-                log_p = log_normalized_prior(model, param_specs=parameter_priors, kernel_param_specs=kernel_parameter_priors, prior=model_parameter_prior)
-                loss -= log_p
-            if verbose:
-                print(f"----")
-                print(f"Final best parameters: {list(model.named_parameters())} w. loss: {loss} (smaller=better)")
-                print(f"----")
-            break
+            if not objective_function:
+                loss = -mll_fkt(model(train_x), train_y)
+                if MAP:
+                    log_p = log_normalized_prior(model, param_specs=parameter_priors, kernel_param_specs=kernel_parameter_priors, prior=model_parameter_prior)
+                    loss -= log_p
+                if verbose:
+                    print(f"----")
+                    print(f"Final best parameters: {list(model.named_parameters())} w. loss: {loss} (smaller=better)")
+                    print(f"----")
+                break
+            else:
+                [loss, _, _] = objective_function(model)
         except Exception:
             continue
     
