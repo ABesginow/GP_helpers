@@ -410,16 +410,16 @@ def extract_model_parameters(model):
 
 def log_normalized_prior(model, param_specs, kernel_param_specs, theta_mu=None, variance=None, prior=None):
     if prior is None:
-        theta_mu, variance = prior_distribution(model, param_specs=param_specs, kernel_param_specs=kernel_param_specs) if theta_mu is None or variance is None else (theta_mu, variance)
-        if not type(theta_mu) == torch.Tensor:
-            theta_mu = torch.tensor(theta_mu)
-        if not type(variance) == torch.Tensor: 
-            variance = torch.tensor(variance)
-            variance = torch.diag(variance)
-        elif not (variance.ndim == 2 and variance.size(0) == variance.size(1)):
-            variance = torch.diag(variance)
+        prior = prior_distribution(model, param_specs=param_specs, kernel_param_specs=kernel_param_specs) if theta_mu is None or variance is None else torch.distributions.MultivariateNormal(theta_mu.t(), variance)
+        #if not type(theta_mu) == torch.Tensor:
+        #    theta_mu = torch.tensor(theta_mu)
+        #if not type(variance) == torch.Tensor: 
+        #    variance = torch.tensor(variance)
+        #    variance = torch.diag(variance)
+        #elif not (variance.ndim == 2 and variance.size(0) == variance.size(1)):
+        #    variance = torch.diag(variance)
 
-        prior = torch.distributions.MultivariateNormal(theta_mu.t(), variance)
+        #prior = torch.distributions.MultivariateNormal(theta_mu.t(), variance)
 
     params = extract_model_parameters(model)
 
