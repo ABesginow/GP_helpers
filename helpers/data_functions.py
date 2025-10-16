@@ -2,7 +2,8 @@ import gpytorch
 import pandas as pd
 import torch
 from typing import List, Union, Callable
-import helpers.gp_classes
+from helpers.gp_classes import DataGPModel
+from helpers.util_functions import prior_distribution, extract_model_parameters, reparameterize_model
 
 # Registry for input patterns
 INPUT_PATTERNS = {}
@@ -330,3 +331,107 @@ class DataGenerator:
         for transformation in transformations:
             inputs = transformation(inputs)
         return inputs
+
+
+def nearest_idx_torch(a, b):
+    a = torch.as_tensor(a)
+    b = torch.as_tensor(b)
+    # pairwise distances for 1D values
+    idx = (a[:, None] - b[None, :]).abs().argmin(dim=1)
+    all_idx = torch.arange(b.shape[0], device=b.device)
+    remaining_b = b[~torch.isin(all_idx, idx)]
+    return idx, ~torch.isin(all_idx, idx), b[idx], remaining_b
+
+
+def generate_appended_prediction_data(data_model, data_likelihood, train_obs, all_observations_y, eval_obs, test_dataset_count=10):
+    total_obs = torch.cat([train_obs, eval_obs], dim=0)
+
+    # Store if model is in training mode
+    previous_state = data_model.training
+
+    # Get into evaluation (predictive posterior) mode
+    data_model.eval()
+    data_likelihood.eval()
+
+    all_test_observations_y = []
+    for i in range(len(all_observations_y)):
+        data_model.set_train_data(train_obs, all_observations_y[i], strict=False)
+        with torch.no_grad():
+            #f_preds = data_likelihood(data_model(eval_obs))
+            f_preds = data_model(eval_obs)
+        test_observations_y = f_preds.sample_n(test_dataset_count)
+        all_test_observations_y.append(test_observations_y)
+
+    # Reverse to previous state
+    if previous_state:
+        data_model.train()
+        data_likelihood.train()
+
+    return eval_obs, all_test_observations_y
+
+
+def sample_data_from_gp(train_START, train_END, train_COUNT, data_kernel, eval_START=None, eval_END=None, eval_COUNT=100, train_dataset_count=5, test_data=True, test_dataset_count=10, interleaved_to_appended_ratio=0.0, use_interleaved_data_as_train_for_app_eval=False):
+    if test_data: 
+        # I want test data, but the interleaved ratio is smaller than 1.0 and there is no eval_START and no eval_END
+        if interleaved_to_appended_ratio < 1.0 and (eval_START is None or eval_END is None):
+            raise ValueError("If you want appended test data, you need to provide eval_START and eval_END.")
+        
+
+    # training data for model initialization (e.g. 1 point with x=0, y=0) ; this makes initializing the model easier
+    prior_x = torch.linspace(0, 1, 1)
+    prior_y = prior_x
+
+    # initialize likelihood and model
+    data_likelihood = gpytorch.likelihoods.GaussianLikelihood()
+    data_model = DataGPModel(prior_x, prior_y, data_likelihood, kernel_name=data_kernel)
+
+    int_eval_COUNT = int(interleaved_to_appended_ratio * eval_COUNT)
+    app_eval_COUNT = eval_COUNT - int_eval_COUNT
+
+    # The interleaved data
+    total_obs = torch.linspace(train_START, train_END, train_COUNT + int_eval_COUNT)
+    train_obs = torch.linspace(train_START, train_END, train_COUNT)
+
+    train_idx, int_eval_idx, train_obs, int_eval_obs = nearest_idx_torch(train_obs, total_obs)
+    assert len(train_obs) == train_COUNT, "Something went wrong with the interleaved training data sampling."
+    assert len(int_eval_obs) == int_eval_COUNT, "Something went wrong with the interleaved evaluation data sampling."
+    assert len(int_eval_obs) + len(train_obs) == len(total_obs), "Something went wrong with the interleaved data sampling."
+
+    # Get into evaluation (predictive posterior) mode
+    data_model.eval()
+    data_likelihood.eval()
+
+    # Make predictions by feeding model
+    with torch.no_grad(), gpytorch.settings.prior_mode(True):
+        all_obs_preds = data_model(total_obs)
+
+    all_observations_y = all_obs_preds.sample_n(max(train_dataset_count, test_dataset_count))
+    all_int_eval_observations_y = all_observations_y[:, int_eval_idx]
+    all_train_observations_y = all_observations_y[:, train_idx]
+
+    if test_data is False:
+        return (train_obs, all_train_observations_y), (None, None), (None, None)
+
+    # The appended data
+    if interleaved_to_appended_ratio == 1.0:
+        return (train_obs, all_train_observations_y), (int_eval_obs, all_int_eval_observations_y), (None, None)
+    eval_obs = torch.linspace(eval_START, eval_END, app_eval_COUNT)
+  # Set the nosie to be almost zero to have the prediction samples continuously connected to the generated training data
+    model_params = extract_model_parameters(data_model)
+    model_params_bak = model_params.clone()
+    model_params[0] = -10.0 # 
+    reparameterize_model(data_model, model_params)
+
+    # Use the interleaved data to further "constrain" the predictions for the appended test data
+    if use_interleaved_data_as_train_for_app_eval:
+        app_eval_obs, all_app_test_observations_y = generate_appended_prediction_data(data_model, data_likelihood, total_obs, all_observations_y=all_observations_y, eval_obs=eval_obs, test_dataset_count=test_dataset_count)
+    # Or use only the training data
+    else:
+        app_eval_obs, all_app_test_observations_y = generate_appended_prediction_data(data_model, data_likelihood, train_obs, all_observations_y=all_train_observations_y, eval_obs=eval_obs, test_dataset_count=test_dataset_count)
+
+    reparameterize_model(data_model, model_params_bak)
+
+    if interleaved_to_appended_ratio == 0.0:
+        return (train_obs, all_train_observations_y), (None, None), (app_eval_obs, all_app_test_observations_y)
+
+    return (train_obs, all_train_observations_y), (int_eval_obs, all_int_eval_observations_y), (app_eval_obs, all_app_test_observations_y)

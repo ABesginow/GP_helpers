@@ -8,7 +8,7 @@ from pygranso.private.getNvar import getNvarTorch
 import torch
 
 
-kernel_parameter_priors = {
+base_kernel_parameter_priors = {
     ("RBFKernel", "lengthscale"): {"mean": 0.0, "std": 10.0}, 
     ("MaternKernel", "lengthscale"): {"mean": 0.0, "std": 10.0},
     ("LinearKernel", "variance"): {"mean": 0.0, "std": 10.0},
@@ -24,13 +24,13 @@ kernel_parameter_priors = {
 }
 
 
-parameter_priors = {
+base_parameter_priors = {
     "likelihood.raw_task_noises": {"mean": 0.0, "std": 10.0},
     "likelihood.raw_noise": {"mean": 0.0, "std": 10.0}
 }
 
 
-kernel_param_specs = {
+base_kernel_param_specs = {
     ("RBFKernel", "lengthscale"): {"bounds": (1e-1, 5.0)}, # add ', "type": "uniform"},' # to use uniform distribution
     ("MaternKernel", "lengthscale"): {"bounds": (1e-1, 1.0)},
     ("LinearKernel", "variance"): {"bounds": (1e-1, 1.0)},
@@ -47,7 +47,7 @@ kernel_param_specs = {
 }
 
 
-param_specs = {
+base_param_specs = {
     "likelihood.raw_task_noises": {"bounds": (1e-1, 1e-0)},
     "likelihood.raw_noise": {"bounds": (1e-1, 1e-0)}
 }
@@ -252,6 +252,10 @@ def granso_optimization(model, likelihood, train_x, train_y, **kwargs):
     model_parameter_prior = kwargs.get("model_parameter_prior", None)
     var_in = kwargs.get("var_in", None)
     objective_function = kwargs.get("objective_function", None)
+    param_specs = kwargs.get("param_specs", base_param_specs)
+    kernel_param_specs = kwargs.get("kernel_param_specs", base_kernel_param_specs)
+    parameter_priors = kwargs.get("parameter_priors", base_parameter_priors)
+    kernel_parameter_priors = kwargs.get("kernel_parameter_priors", base_kernel_parameter_priors)
 
 
     """

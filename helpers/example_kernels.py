@@ -43,6 +43,10 @@ def available() -> List[str]:
 def _lin(*, active_dims=None, **_):
     return gpytorch.kernels.LinearKernel(active_dims=active_dims)
 
+@register("MAT12")
+def _mat32(*, active_dims=None, **_):
+    return gpytorch.kernels.MaternKernel(nu=0.5, active_dims=active_dims)
+
 @register("MAT32")
 def _mat32(*, active_dims=None, **_):
     return gpytorch.kernels.MaternKernel(nu=1.5, active_dims=active_dims)

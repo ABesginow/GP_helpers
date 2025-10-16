@@ -1,5 +1,66 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import torch
+
+
+def plot_3d_gp(model, likelihood, data=None, x_min=0.0, x_max=1.0, y_min=0.0, y_max=1.0,
+                resolution=50, return_figure=False, fig=None, ax=None, 
+                display_figure=True, loss_val=None, loss_type=None, shadow=False,
+                title_add = ""):
+    if not (fig and ax):
+        fig = plt.figure(figsize=(8, 6))
+        ax = fig.add_subplot(111, projection='3d')
+
+
+    if data is not None:
+        if data.ndim == 1:
+            data = data.unsqueeze(0)
+
+        for sample in data:
+            xx = sample[0]
+            yy = sample[1]
+            zz = sample[2]
+            ax.scatter(xx.numpy(), yy.numpy(), zz.numpy(), color="red", alpha=0.8)
+
+            if shadow:
+                # Plot shadows (projection on X-Y plane at z=0)
+                ax.scatter(xx.numpy(), yy.numpy(), 
+                        min(data[:,2].numpy()), 
+                        c='gray', alpha=0.3, marker='o')
+    model.eval()
+    likelihood.eval()
+
+    x_vals = torch.linspace(x_min, x_max, resolution)
+    y_vals = torch.linspace(y_min, y_max, resolution)
+    xx, yy = torch.meshgrid(x_vals, y_vals)
+    test_x = torch.stack([xx.reshape(-1), yy.reshape(-1)], dim=-1)
+
+    with torch.no_grad():
+        preds = likelihood(model(test_x))
+        mean = preds.mean.reshape(resolution, resolution)
+        lower, upper = preds.confidence_region()
+        lower = lower.reshape(resolution, resolution)
+        upper = upper.reshape(resolution, resolution)
+
+
+    # Plot mean surface
+    ax.plot_surface(xx.numpy(), yy.numpy(), mean.numpy(), cmap='viridis', alpha=0.8)
+
+    # Plot lower and upper surfaces
+    ax.plot_surface(xx.numpy(), yy.numpy(), lower.numpy(), color='gray', alpha=0.2)
+    ax.plot_surface(xx.numpy(), yy.numpy(), upper.numpy(), color='gray', alpha=0.2)
+
+    ax.set_title(f'2D GP in 3D {title_add}')
+    if loss_val is not None:
+        ax.set_title(f"{ax.title.get_text()}; {loss_type}: {loss_val}")
+    ax.set_xlabel('X1')
+    ax.set_ylabel('X2')
+    ax.set_zlabel('Mean and Variance Range')
+
+    if not return_figure and display_figure:
+        plt.show()
+    else:
+        return fig, ax
 
 
 # Usage examples:
