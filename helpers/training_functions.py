@@ -31,16 +31,17 @@ base_parameter_priors = {
 
 
 base_kernel_param_specs = {
-    ("RBFKernel", "lengthscale"): {"bounds": (1e-1, 5.0)}, # add ', "type": "uniform"},' # to use uniform distribution
-    ("MaternKernel", "lengthscale"): {"bounds": (1e-1, 1.0)},
+    ("RBFKernel", "lengthscale"): {"bounds": (-1.0, 10.0), "type":"uniform"}, # add ', "type": "uniform"},' # to use uniform distribution
+    ("MaternKernel", "lengthscale"): {"bounds": (-1.0, 10.0), "type":"uniform"},
     ("LinearKernel", "variance"): {"bounds": (1e-1, 1.0)},
     ("AffineKernel", "variance"): {"bounds": (1e-1, 1.0)},
-    ("RQKernel", "lengthscale"): {"bounds": (1e-1, 1.0)},
-    ("RQKernel", "alpha"): {"bounds": (1e-1, 1.0)},
-    ("CosineKernel", "period_length"): {"bounds": (1e-1, 10.0), "type": "uniform"},
-    ("PeriodicKernel", "lengthscale"): {"bounds": (1e-1, 5.0)},
-    ("PeriodicKernel", "period_length"): {"bounds": (1e-1, 10.0), "type": "uniform"},
-    ("ScaleKernel", "outputscale"): {"bounds": (1e-1, 10.0)},
+    ("RQKernel", "lengthscale"): {"bounds": (-1.0, 10.0), "type":"uniform"},
+    ("RQKernel", "alpha"): {"bounds": (1e-1, 10.0), "type":"uniform"},
+    ("CosineKernel", "period_length"): {"bounds": (-1.0, 10.0), "type": "uniform"},
+    #("PeriodicKernel", "lengthscale"): {"bounds": (1e-1, 5.0)},
+    #("PeriodicKernel", "period_length"): {"bounds": (-1.0, 10.0), "type": "uniform"},
+    ("PeriodicKernel", "period_length"): {"bounds": (-1.0, 10.0), "type": "uniform"},
+    ("ScaleKernel", "outputscale"): {"bounds": (-1.0, 10.0), "type": "uniform"},
     #("LODE_Kernel", "signal_variance_2_0"): {"bounds": (0.05, 0.5)},  # full match
     ("LODE_Kernel", "signal_variance"): {"bounds": (1e-1, 10)},  # base
     ("LODE_Kernel", "lengthscale"): {"bounds": (1e-1, 5.0)},           
@@ -49,7 +50,7 @@ base_kernel_param_specs = {
 
 base_param_specs = {
     "likelihood.raw_task_noises": {"bounds": (1e-1, 1e-0)},
-    "likelihood.raw_noise": {"bounds": (1e-1, 1e-0)}
+    "likelihood.raw_noise": {"bounds": (1e-0, 1e+1), "type":"uniform"}
 }
 
 
@@ -303,7 +304,11 @@ def granso_optimization(model, likelihood, train_x, train_y, **kwargs):
             except Exception as E:
                 print("LOG ERROR: Severe PyGRANSO issue. Loss is inf+0")
                 print(f"LOG ERROR: {E}")
-                loss = torch.tensor(np.finfo(np.float32).max, requires_grad=True) + torch.tensor(-10.0)
+                #loss = torch.tensor(np.finfo(np.float32).max, requires_grad=True) + torch.tensor(-10.0)
+                BIG = 1e6            # large penalty
+                LAMBDA = 1e-6        # tiny L2 so grads exist even in fallback
+                theta = torch.cat([p.reshape(-1) for p in model.parameters()])
+                loss = BIG + LAMBDA * (theta @ theta)
             if MAP:
                 # log_normalized_prior is in metrics.py 
                 log_p = log_normalized_prior(model, param_specs=parameter_priors, kernel_param_specs=kernel_parameter_priors, prior=model_parameter_prior)

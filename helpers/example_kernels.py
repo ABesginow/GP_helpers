@@ -1,6 +1,7 @@
 # gp/kernels.py
 from typing import Callable, Dict, List, Sequence
 import gpytorch
+import torch
 
 # ---------- registry ----------
 _REGISTRY: Dict[str, Callable[..., gpytorch.kernels.Kernel]] = {}
@@ -95,6 +96,13 @@ def _mat32(*, active_dims=None, **_):
 def _mat52(*, active_dims=None, **_):
     return gpytorch.kernels.ScaleKernel(
         gpytorch.kernels.MaternKernel(nu=2.5, active_dims=active_dims))
+
+@register("C*RQ")
+def _c_rq(*, active_dims=None, **_):
+    return gpytorch.kernels.ScaleKernel(_rq(active_dims=active_dims))
+
+
+
 ####### Combinations of base kernels (size 2)
 
 @register("LIN*PER")
@@ -181,6 +189,45 @@ def _se_plus_rq_times_per(*, active_dims=None, **_):
     return _per(active_dims=active_dims) * \
            (_se(active_dims=active_dims) +
             _rq(active_dims=active_dims))
+
+
+
+# The Mauna Loa kernels
+@register("k1")
+def k1(*, active_dims=None, **_):
+    return _c_se(active_dims=active_dims)
+
+@register("k2")
+def k2(*, active_dims=None, **_):
+    se_kern = _c_se(active_dims=active_dims)
+    per_kern = _per(active_dims=active_dims)
+    per_kern.raw_period_length.requires_grad = False
+    #per_kern.register_parameter("raw_lengthscale", se_kern.base_kernel.raw_lengthscale)
+    # Then register the SE kernel's parameter object in its place
+    #per_kern.register_parameter("raw_lengthscale", se_kern.base_kernel.raw_lengthscale)
+    return gpytorch.kernels.ProductKernel(se_kern, per_kern)
+
+@register("k3")
+def k3(*, active_dims=None, **_):
+    return _c_rq(active_dims=active_dims) 
+
+@register("k4")
+def k4(*, active_dims=None, **_):
+    return _c_se(active_dims=active_dims) 
+
+
+@register("k1 + k2")
+def k1_plus_k2(*, active_dims=None, **_):
+    return k1(active_dims=active_dims) + k2(active_dims=active_dims)
+        
+@register("k1 + k2 + k3")
+def k1_plus_k2_plus(*, active_dims=None, **_):
+    return k1(active_dims=active_dims) + k2(active_dims=active_dims) + k3(active_dims=active_dims)
+
+@register("k1 + k2 + k3 + k4")
+def k1_plus_k2_plus(*, active_dims=None, **_):
+    return k1(active_dims=active_dims) + k2(active_dims=active_dims) + k3(active_dims=active_dims) + k4(active_dims=active_dims)
+
 
 ###############################################################################
 ############################### MI Kernels ####################################

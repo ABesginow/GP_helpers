@@ -240,7 +240,7 @@ def randomize_model_hyperparameters(
     kernel_types = get_full_kernels_in_kernel_expression(model.covar_module)
     kernel_index = 0
 
-    for name, param in model.named_hyperparameters():
+    for name, param in [p for p in model.named_hyperparameters() if p[1].requires_grad]:
         shape = param.shape
 
         # Case 1: Full-name match
@@ -360,7 +360,7 @@ def prior_distribution(
     kernel_types = get_full_kernels_in_kernel_expression(model.covar_module)
     kernel_index = 0
 
-    for name, _ in model.named_hyperparameters():
+    for name, _ in [p for p in model.named_parameters() if p[1].requires_grad]:
         if not param_specs is None:
             if name in param_specs:
                 kernel_type = "<explicit>"
@@ -394,9 +394,9 @@ def prior_distribution(
     return torch.distributions.MultivariateNormal(torch.tensor(mean_values), torch.diag(torch.tensor(var_values)))
 
 
-def extract_model_parameters(model):
+def extract_trainable_model_parameters(model):
     params = None
-    for (_, param) in model.named_parameters():
+    for (_, param) in [p for p in model.named_parameters() if p[1].requires_grad]:
         if params == None:
             params = param
         else:
@@ -421,7 +421,7 @@ def log_normalized_prior(model, param_specs, kernel_param_specs, theta_mu=None, 
 
         #prior = torch.distributions.MultivariateNormal(theta_mu.t(), variance)
 
-    params = extract_model_parameters(model)
+    params = extract_trainable_model_parameters(model)
 
     # for convention reasons I'm dividing by the number of datapoints
     log_prob = prior.log_prob(params) / len(*model.train_inputs)
