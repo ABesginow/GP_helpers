@@ -202,6 +202,7 @@ def k2(*, active_dims=None, **_):
     se_kern = _c_se(active_dims=active_dims)
     per_kern = _per(active_dims=active_dims)
     per_kern.raw_period_length.requires_grad = False
+    per_kern.raw_period_length.data = torch.tensor(0.541246)
     #per_kern.register_parameter("raw_lengthscale", se_kern.base_kernel.raw_lengthscale)
     # Then register the SE kernel's parameter object in its place
     #per_kern.register_parameter("raw_lengthscale", se_kern.base_kernel.raw_lengthscale)
