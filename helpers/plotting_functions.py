@@ -1,6 +1,192 @@
 import matplotlib.pyplot as plt
+import matplotlib.colors as clrs
 import numpy as np
 import torch
+
+def plot_3d_mean_conf(mean, lower, upper, data=None, x_min=0.0, x_max=1.0, y_min=0.0, y_max=1.0,
+                resolution=50, return_figure=False, fig=None, ax=None, 
+                display_figure=True, loss_val=None, loss_type=None, shadow=False,
+                title_add = ""):
+    if not (fig and ax):
+        fig = plt.figure(figsize=(8, 6))
+        ax = fig.add_subplot(111, projection='3d')
+
+
+    if data is not None:
+        if data.ndim == 1:
+            data = data.unsqueeze(0)
+
+        for sample in data:
+            xx = sample[0]
+            yy = sample[1]
+            zz = sample[2]
+            ax.scatter(xx.numpy(), yy.numpy(), zz.numpy(), color="red", alpha=0.8)
+
+            if shadow:
+                # Plot shadows (projection on X-Y plane at z=0)
+                ax.scatter(xx.numpy(), yy.numpy(), 
+                        min(data[:,2].numpy()), 
+                        c='gray', alpha=0.3, marker='o')
+    #model.eval()
+    #likelihood.eval()
+
+    x_vals = torch.linspace(x_min, x_max, resolution)
+    y_vals = torch.linspace(y_min, y_max, resolution)
+    xx, yy = torch.meshgrid(x_vals, y_vals)
+    test_x = torch.stack([xx.reshape(-1), yy.reshape(-1)], dim=-1)
+
+    #with torch.no_grad():
+    #    preds = likelihood(model(test_x))
+    #    mean = preds.mean.reshape(resolution, resolution)
+    #    lower, upper = preds.confidence_region()
+    #    lower = lower.reshape(resolution, resolution)
+    #    upper = upper.reshape(resolution, resolution)
+
+
+    # Plot mean surface
+    ax.plot_surface(xx.numpy(), yy.numpy(), mean.numpy(), cmap='viridis', alpha=0.8)
+
+    # Plot lower and upper surfaces
+    ax.plot_surface(xx.numpy(), yy.numpy(), lower.numpy(), color='gray', alpha=0.2)
+    ax.plot_surface(xx.numpy(), yy.numpy(), upper.numpy(), color='gray', alpha=0.2)
+
+    ax.set_title(f'2D GP in 3D {title_add}')
+    if loss_val is not None:
+        ax.set_title(f"{ax.title.get_text()}; {loss_type}: {loss_val}")
+    ax.set_xlabel('X1')
+    ax.set_ylabel('X2')
+    ax.set_zlabel('Mean and Variance Range')
+
+    if not return_figure and display_figure:
+        plt.show()
+    else:
+        return fig, ax
+
+def normalize_ticks(ax, axis):
+    if axis == 'x':
+        vals = ax.get_xticks()
+        norm_vals = (vals - vals.min()) / (vals.max() - vals.min())
+        ax.set_xticklabels([f"{v:.2f}" for v in norm_vals])
+    elif axis == 'y':
+        vals = ax.get_yticks()
+        norm_vals = (vals - vals.min()) / (vals.max() - vals.min())
+        ax.set_yticklabels([f"{v:.2f}" for v in norm_vals])
+
+
+def plot_3d_gp_subset(model, likelihood, data=None, x_min=0.0, x_max=1.0, y_min=0.0, y_max=1.0,
+                resolution=50, return_figure=False, fig=None, ax=None, 
+                display_figure=True, loss_val=None, loss_type=None, shadow=False,
+                title = "", fixed_x=None, dim_i=0, dim_j=1, zlim=None, x_label_name=None, y_label_name=None, z_label_name=None, z_vmin=None, z_vmax=None, plot_normalized_ticks=False):
+    if not (fig and ax):
+        fig = plt.figure(figsize=(8, 6))
+        ax = fig.add_subplot(111, projection='3d')
+
+
+    if data is not None:
+        if data.ndim == 1:
+            data = data.unsqueeze(0)
+
+        for sample in data:
+            xx = sample[0]
+            yy = sample[1]
+            zz = sample[2]
+            ax.scatter(xx.numpy(), yy.numpy(), zz.numpy(), color="red", alpha=0.8)
+
+            if shadow:
+                # Plot shadows (projection on X-Y plane at z=0)
+                ax.scatter(xx.numpy(), yy.numpy(), 
+                        min(data[:,2].numpy()), 
+                        c='gray', alpha=0.3, marker='o')
+
+    if fixed_x is None:
+        #fixed_x = torch.tensor([150., 300., 120, 140, 130, 110,  96])
+        fixed_x = torch.tensor([150., 300., 140, 154, 141, 111,  97])
+
+
+    d = fixed_x.shape[-1]
+    model.eval()
+    likelihood.eval()
+
+    # Higher dimension input
+    # make grid
+    xi = torch.linspace(x_min, x_max, resolution)
+    xj = torch.linspace(y_min, y_max, resolution)
+    xx, yy = torch.meshgrid(xi, xj, indexing="ij")
+    X = fixed_x.expand(resolution*resolution, d).clone()
+    X[:, dim_i] = xx.reshape(-1)
+    X[:, dim_j] = yy.reshape(-1)
+
+    # posterior for the single output
+    total_mean = None
+    total_var = None
+    for gp in model.models:
+        with torch.no_grad():
+            post = gp.posterior(X, observation_noise=False)
+            if total_mean is None:
+                total_mean = post.mean.squeeze(-1).reshape(resolution, resolution)
+            else:
+                total_mean = total_mean + post.mean.squeeze(-1).reshape(resolution, resolution)
+            if total_var is None:
+                total_var = post.variance.squeeze(-1).reshape(resolution, resolution)
+            else:
+                total_var = total_var + post.variance.squeeze(-1).reshape(resolution, resolution)
+    mean = total_mean
+    var = total_var
+    lower = mean - 2*var.sqrt()
+    upper = mean + 2*var.sqrt()
+
+    ## 2D input
+    #x_vals = torch.linspace(x_min, x_max, resolution)
+    #y_vals = torch.linspace(y_min, y_max, resolution)
+    #xx, yy = torch.meshgrid(x_vals, y_vals)
+    #test_x = torch.stack([xx.reshape(-1), yy.reshape(-1)], dim=-1)
+
+    #with torch.no_grad():
+    #    preds = likelihood(model(test_x))
+    #    mean = preds.mean.reshape(resolution, resolution)
+    #    lower, upper = preds.confidence_region()
+    #    lower = lower.reshape(resolution, resolution)
+    #    upper = upper.reshape(resolution, resolution)
+
+
+    # Plot mean surface
+    #norm = clrs.Normalize(vmin=0, vmax=8)
+    if z_vmin and z_vmax:
+        im = ax.plot_surface(xx.numpy(), yy.numpy(), mean.numpy(), cmap='viridis', alpha=0.8, vmin=z_vmin, vmax=z_vmax)
+    else:
+        im = ax.plot_surface(xx.numpy(), yy.numpy(), mean.numpy(), cmap='viridis', alpha=0.8)
+
+    # Plot lower and upper surfaces
+    ax.plot_surface(xx.numpy(), yy.numpy(), lower.numpy(), color='gray', alpha=0.2)
+    ax.plot_surface(xx.numpy(), yy.numpy(), upper.numpy(), color='gray', alpha=0.2)
+    fig.colorbar(im, shrink=0.7)
+
+    if title:
+        ax.set_title(title)
+    elif loss_val is not None:
+        ax.set_title(f"{ax.title.get_text()}; {loss_type}: {loss_val}")
+
+    ax.set_xlabel(x_label_name, rotation=-18)
+    #ax.xaxis.labelpad=0.0 # <- change the value here
+    ax.set_ylabel(y_label_name, rotation=50)
+    #ax.yaxis.labelpad=-0.0 # <- change the value here
+    ax.set_zlabel(z_label_name, rotation=90)
+    ax.zaxis.labelpad=-1.0 # <- change the value here
+
+    if zlim:
+        ax.set_zlim(zlim)
+
+    if plot_normalized_ticks:
+        normalize_ticks(ax, 'x')
+        normalize_ticks(ax, 'y')
+    elif plot_no_ticks:
+        ax.set_xticklabels([])
+        ax.set_yticklabels([])
+
+    if not return_figure and display_figure:
+        plt.show()
+    else:
+        return fig, ax
 
 
 def plot_3d_gp(model, likelihood, data=None, x_min=0.0, x_max=1.0, y_min=0.0, y_max=1.0,
