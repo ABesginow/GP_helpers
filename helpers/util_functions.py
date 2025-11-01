@@ -95,8 +95,12 @@ def match_lode_parameter_spec(param_name, kernel_param_specs, default_bounds, de
     return default_bounds, default_type
 
 
-def reparameterize_model(model, theta):
+def reparameterize_model_full(model, theta):
     for model_param, sampled_param in zip(model.parameters(), theta):
+        model_param.data = torch.full_like(model_param.data, float(sampled_param))
+
+def reparameterize_model_trainable(model, theta):
+    for model_param, sampled_param in zip([p for p in model.parameters() if p.requires_grad], theta):
         model_param.data = torch.full_like(model_param.data, float(sampled_param))
 
 

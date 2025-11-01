@@ -3,7 +3,7 @@ import pandas as pd
 import torch
 from typing import List, Union, Callable
 from helpers.gp_classes import DataGPModel
-from helpers.util_functions import prior_distribution, extract_model_parameters, reparameterize_model
+from helpers.util_functions import extract_trainable_model_parameters, reparameterize_model_trainable
 
 # Registry for input patterns
 INPUT_PATTERNS = {}
@@ -416,11 +416,11 @@ def sample_data_from_gp(train_START, train_END, train_COUNT, data_kernel, eval_S
     if interleaved_to_appended_ratio == 1.0:
         return (train_obs, all_train_observations_y), (int_eval_obs, all_int_eval_observations_y), (None, None)
     eval_obs = torch.linspace(eval_START, eval_END, app_eval_COUNT)
-  # Set the nosie to be almost zero to have the prediction samples continuously connected to the generated training data
-    model_params = extract_model_parameters(data_model)
+    # Set the nosie to be almost zero to have the prediction samples continuously connected to the generated training data
+    model_params = extract_trainable_model_parameters(data_model)
     model_params_bak = model_params.clone()
     model_params[0] = -10.0 # 
-    reparameterize_model(data_model, model_params)
+    reparameterize_model_trainable(data_model, model_params)
 
     # Use the interleaved data to further "constrain" the predictions for the appended test data
     if use_interleaved_data_as_train_for_app_eval:
@@ -429,7 +429,7 @@ def sample_data_from_gp(train_START, train_END, train_COUNT, data_kernel, eval_S
     else:
         app_eval_obs, all_app_test_observations_y = generate_appended_prediction_data(data_model, data_likelihood, train_obs, all_observations_y=all_train_observations_y, eval_obs=eval_obs, test_dataset_count=test_dataset_count)
 
-    reparameterize_model(data_model, model_params_bak)
+    reparameterize_model_trainable(data_model, model_params_bak)
 
     if interleaved_to_appended_ratio == 0.0:
         return (train_obs, all_train_observations_y), (None, None), (app_eval_obs, all_app_test_observations_y)
