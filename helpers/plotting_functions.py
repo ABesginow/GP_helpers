@@ -76,7 +76,7 @@ def normalize_ticks(ax, axis):
 def plot_3d_gp_subset(model, likelihood, data=None, x_min=0.0, x_max=1.0, y_min=0.0, y_max=1.0,
                 resolution=50, return_figure=False, fig=None, ax=None, 
                 display_figure=True, loss_val=None, loss_type=None, shadow=False,
-                title = "", fixed_x=None, dim_i=0, dim_j=1, zlim=None, x_label_name=None, y_label_name=None, z_label_name=None, z_vmin=None, z_vmax=None, plot_normalized_ticks=False, plot_no_ticks=False, activate_colorbar=False, label_fontsize=16):
+                title = "", fixed_x=None, dim_i=0, dim_j=1, zlim=None, x_label_name=None, y_label_name=None, z_label_name=None, z_vmin=None, z_vmax=None, plot_normalized_ticks=False, plot_no_ticks=False, activate_colorbar=False, label_fontsize=16, title_fontsize=16):
     if not (fig and ax):
         fig = plt.figure(figsize=(8, 6))
         ax = fig.add_subplot(111, projection='3d')
@@ -168,9 +168,9 @@ def plot_3d_gp_subset(model, likelihood, data=None, x_min=0.0, x_max=1.0, y_min=
         fig.colorbar(im, shrink=0.7)
 
     if title:
-        ax.set_title(title)
+        ax.set_title(title, fontsize=title_fontsize)
     elif loss_val is not None:
-        ax.set_title(f"{ax.title.get_text()}; {loss_type}: {loss_val}")
+        ax.set_title(f"{ax.title.get_text()}; {loss_type}: {loss_val}", fontsize=title_fontsize)
 
     ax.set_xlabel(x_label_name, fontsize=label_fontsize, rotation=-18)
     #ax.xaxis.labelpad=0.0 # <- change the value here
