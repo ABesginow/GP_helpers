@@ -76,7 +76,7 @@ def normalize_ticks(ax, axis):
 def plot_3d_gp_subset(model, likelihood, data=None, x_min=0.0, x_max=1.0, y_min=0.0, y_max=1.0,
                 resolution=50, return_figure=False, fig=None, ax=None, 
                 display_figure=True, loss_val=None, loss_type=None, shadow=False,
-                title = "", fixed_x=None, dim_i=0, dim_j=1, zlim=None, x_label_name=None, y_label_name=None, z_label_name=None, z_vmin=None, z_vmax=None, plot_normalized_ticks=False):
+                title = "", fixed_x=None, dim_i=0, dim_j=1, zlim=None, x_label_name=None, y_label_name=None, z_label_name=None, z_vmin=None, z_vmax=None, plot_normalized_ticks=False, plot_no_ticks=False, activate_colorbar=False, label_fontsize=16):
     if not (fig and ax):
         fig = plt.figure(figsize=(8, 6))
         ax = fig.add_subplot(111, projection='3d')
@@ -148,10 +148,15 @@ def plot_3d_gp_subset(model, likelihood, data=None, x_min=0.0, x_max=1.0, y_min=
     #    lower = lower.reshape(resolution, resolution)
     #    upper = upper.reshape(resolution, resolution)
 
+    import matplotlib as mpl
 
     # Plot mean surface
-    #norm = clrs.Normalize(vmin=0, vmax=8)
-    if z_vmin and z_vmax:
+    norm = clrs.Normalize(vmin=0, vmax=8)
+    cmap = mpl.cm.viridis
+    sm = mpl.cm.ScalarMappable(norm=norm, cmap=cmap)
+    sm.set_array([])  # required for older Matplotlib versions
+
+    if type(z_vmin) == int and type(z_vmax) == int:
         im = ax.plot_surface(xx.numpy(), yy.numpy(), mean.numpy(), cmap='viridis', alpha=0.8, vmin=z_vmin, vmax=z_vmax)
     else:
         im = ax.plot_surface(xx.numpy(), yy.numpy(), mean.numpy(), cmap='viridis', alpha=0.8)
@@ -159,18 +164,19 @@ def plot_3d_gp_subset(model, likelihood, data=None, x_min=0.0, x_max=1.0, y_min=
     # Plot lower and upper surfaces
     ax.plot_surface(xx.numpy(), yy.numpy(), lower.numpy(), color='gray', alpha=0.2)
     ax.plot_surface(xx.numpy(), yy.numpy(), upper.numpy(), color='gray', alpha=0.2)
-    fig.colorbar(im, shrink=0.7)
+    if activate_colorbar:
+        fig.colorbar(im, shrink=0.7)
 
     if title:
         ax.set_title(title)
     elif loss_val is not None:
         ax.set_title(f"{ax.title.get_text()}; {loss_type}: {loss_val}")
 
-    ax.set_xlabel(x_label_name, rotation=-18)
+    ax.set_xlabel(x_label_name, fontsize=label_fontsize, rotation=-18)
     #ax.xaxis.labelpad=0.0 # <- change the value here
-    ax.set_ylabel(y_label_name, rotation=50)
+    ax.set_ylabel(y_label_name, fontsize=label_fontsize, rotation=50)
     #ax.yaxis.labelpad=-0.0 # <- change the value here
-    ax.set_zlabel(z_label_name, rotation=90)
+    ax.set_zlabel(z_label_name, fontsize=label_fontsize, rotation=90)
     ax.zaxis.labelpad=-1.0 # <- change the value here
 
     if zlim:
