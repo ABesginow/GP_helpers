@@ -435,7 +435,7 @@ def plot_single_input_gp_posterior(
         color = colors[i]
 
         # Training data
-        ax_i.scatter(X_train, Y_train[:, i], color='black', s=20, label='Training Data', zorder=3, marker='x')
+        ax_i.scatter(X_train, Y_train[:, i], color='red', s=5, label='Training Data', zorder=3, marker='o')
 
         # Posterior mean
         ax_i.plot(X_test, Y_pred_mean[:, i], color=color, label='Posterior Mean')
@@ -444,7 +444,7 @@ def plot_single_input_gp_posterior(
         std_dev = np.sqrt(Y_pred_var[:, i])
         lower = Y_pred_mean[:, i] - n_std * std_dev
         upper = Y_pred_mean[:, i] + n_std * std_dev
-        ax_i.fill_between(X_test, lower, upper, color=color, alpha=0.3, label=f'{n_std}$\sigma$ Interval')
+        ax_i.fill_between(X_test, lower, upper, color=color, alpha=0.3, label=f'$95\%$ Credible Interval')
 
         # Titles and labels
         ax_i.set_title(titles[i])

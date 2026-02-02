@@ -1,6 +1,7 @@
 import itertools
 import torch
 import numpy as np
+from typing import Union
 
 
 # An empirically derived prior for the parameters of the kernels
@@ -99,7 +100,7 @@ def reparameterize_model_full(model, theta):
     for model_param, sampled_param in zip(model.parameters(), theta):
         model_param.data = torch.full_like(model_param.data, float(sampled_param))
 
-def reparameterize_model_trainable(model, theta):
+def reparameterize_model_trainable(model, theta: Union[list, torch.tensor]):
     for model_param, sampled_param in zip([p for p in model.parameters() if p.requires_grad], theta):
         model_param.data = torch.full_like(model_param.data, float(sampled_param))
 
@@ -391,6 +392,9 @@ def prior_distribution(
             mean_values.extend([spec["mean"] for _ in range(model.num_tasks)])
             var_values.extend([spec["std"]**2 for _ in range(model.num_tasks)])
         # These are also ARD Kernels, which I usually don't care about, that have the same issue
+        elif name == "covar_module.raw_n_sum_scale":
+            mean_values.extend([spec["mean"] for _ in range(model.covar_module.num_sigmas)])
+            var_values.extend([spec["std"]**2 for _ in range(model.covar_module.num_sigmas)])
         else:
             mean_values.append(spec["mean"])
             var_values.append(spec["std"]**2)
@@ -402,7 +406,15 @@ def extract_trainable_model_parameters(model):
     params = None
     for (_, param) in [p for p in model.named_parameters() if p[1].requires_grad]:
         if params == None:
-            params = param
+            if len(param.shape) == 0:
+                params = torch.Tensor([param])
+            elif len(param.shape) == 1:
+                #params = torch.cat((torch.Tensor([]), param))
+                params = torch.Tensor([*param])
+            else:
+                params = torch.Tensor([*param.squeeze(0)])
+
+            #params = param
         else:
             if len(param.shape)==0:
                 params = torch.cat((params, param.unsqueeze(0)))

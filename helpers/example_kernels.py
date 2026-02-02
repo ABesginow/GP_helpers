@@ -230,6 +230,27 @@ def k1_plus_k2_plus(*, active_dims=None, **_):
     return k1(active_dims=active_dims) + k2(active_dims=active_dims) + k3(active_dims=active_dims) + k4(active_dims=active_dims)
 
 
+
+##### Laplace examples
+
+@register("C*SE+C*SE")
+def _c_se_plus_c_se(*, active_dims=None, **_):
+    return _c_se(active_dims=active_dims) + \
+           _c_se(active_dims=active_dims)
+
+@register("SUM_N(C*SE)")
+def _n_sum_c_se(*, active_dims=None, num_kernels, **_):
+    return gpytorch.kernels.AdditiveKernel(*[_c_se(active_dims=active_dims) for _ in range(num_kernels)])
+           
+
+
+
+
+
+
+
+
+
 ###############################################################################
 ############################### MI Kernels ####################################
 ###############################################################################
